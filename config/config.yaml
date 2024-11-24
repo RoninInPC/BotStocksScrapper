@@ -1,0 +1,16 @@
+tokens:
+  telegram: "bot-token"
+  tinkoff-api: "tinkoff-api-token"
+tracked-stocks:
+  - ticker: "TCSG"
+    anomaly-size: 8000000000
+  - ticker: "LKOH"
+    anomaly-size: 8000000000
+  - ticker: "SBER"
+    anomaly-size: 8000000000
+  - ticker: "GAZP"
+    anomaly-size: 8000000000
+  - ticker: "ROSN"
+    anomaly-size: 7000000000
+  - ticker: "NVTK"
+    anomaly-size: 8000000000
