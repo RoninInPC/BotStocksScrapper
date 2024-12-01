@@ -35,15 +35,15 @@ type Stock struct {
 // SalesPerDayVolume - Объем продаж за день в копейках
 type StockInfo struct {
 	Stock                 Stock
-	Price                 uint64
-	Volume                uint64
+	Price                 float64
+	Volume                float64
 	VolumeChange          float64
 	StockMove             StockMoveType
 	PriceChangePerDay     float64
 	PurchasesPerDay       float64
-	PurchasesPerDayVolume uint64
+	PurchasesPerDayVolume float64
 	SalesPerDay           float64
-	SalesPerDayVolume     uint64
+	SalesPerDayVolume     float64
 }
 
 // Возвращает строку от StockInfo с информацией о полях Stock.Name, Stock.Tag, Stock.FIGI, Price, StockMove, Volume
@@ -55,5 +55,6 @@ func (s *StockInfo) String() string {
 // Отслеживаемые акции
 type TrackedStock struct {
 	StockTag    string `yaml:"ticker"`       // Тег акции (например TCSG)
+	FIGI        string `yaml:"figi"`         // Уникальный идентификатор инструмента
 	AnomalySize uint64 `yaml:"anomaly-size"` // Граница аномалии
 }
