@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"BotStocksScrapper/entity"
 	"github.com/sirupsen/logrus"
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
-	"scrapper-bot/entity"
 )
 
 type ApiDriver struct {

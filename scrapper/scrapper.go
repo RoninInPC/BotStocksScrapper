@@ -3,7 +3,7 @@ package scrapper
 import (
 	"time"
 
-	"scrapper-bot/entity"
+	"BotStocksScrapper/entity"
 )
 
 type Scrapper interface {

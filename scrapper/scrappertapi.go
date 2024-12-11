@@ -1,15 +1,15 @@
 package scrapper
 
 import (
+	"github.com/sirupsen/logrus"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"scrapper-bot/config"
-	dr "scrapper-bot/driver"
-	"scrapper-bot/entity"
+	"BotStocksScrapper/config"
+	dr "BotStocksScrapper/driver"
+	"BotStocksScrapper/entity"
 )
 
-type scrapper struct {
+type ScrapperTAPI struct {
 	config        config.Config
 	driver        *dr.ApiDriver
 	trackedStocks []entity.TrackedStock
@@ -18,20 +18,19 @@ type scrapper struct {
 	logger        *logrus.Logger
 }
 
-func NewScrapper(config config.Config, lg *logrus.Logger) (Scrapper, error) {
-	s := scrapper{
+func InitScrapper(config config.Config, lg *logrus.Logger) (ScrapperTAPI, error) {
+	s := ScrapperTAPI{
 		StockChannel:  make(chan entity.StockInfo, 100),
 		stopScrapping: make(chan bool),
 		config:        config,
 		trackedStocks: config.StocksList,
-		logger:        lg,
 	}
 
 	var err error
 	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, lg)
 	if err != nil {
 		s.logger.Errorf("не удалось создать драйвер tinkoff api: %s", err.Error())
-		return scrapper{}, err
+		return ScrapperTAPI{}, err
 	}
 
 	return s, nil
@@ -39,7 +38,7 @@ func NewScrapper(config config.Config, lg *logrus.Logger) (Scrapper, error) {
 
 // Запускает горутину скраппера.
 // Возвращает канал в который приходят отловленные аномалии
-func (s scrapper) Scrape(sleepTimeMs time.Duration) <-chan entity.StockInfo {
+func (s ScrapperTAPI) Scrape(sleepTime time.Duration) <-chan entity.StockInfo {
 	go func() {
 		for {
 			select {
@@ -58,7 +57,7 @@ func (s scrapper) Scrape(sleepTimeMs time.Duration) <-chan entity.StockInfo {
 					}
 				}
 			}
-			time.Sleep(time.Millisecond * sleepTimeMs)
+			time.Sleep(sleepTime)
 		}
 	}()
 
@@ -66,6 +65,6 @@ func (s scrapper) Scrape(sleepTimeMs time.Duration) <-chan entity.StockInfo {
 }
 
 // Посылает сигнал для остановки скраппинга
-func (s *scrapper) StopScrape() {
+func (s *ScrapperTAPI) StopScrape() {
 	s.stopScrapping <- true
 }

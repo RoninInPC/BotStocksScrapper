@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"BotStocksScrapper/entity"
 	"github.com/tinkoff/invest-api-go-sdk/investgo"
 	"gopkg.in/yaml.v3"
-	"scrapper-bot/entity"
 )
 
 type Config struct {
