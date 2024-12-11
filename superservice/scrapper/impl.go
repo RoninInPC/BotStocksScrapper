@@ -3,10 +3,9 @@ package scrapper
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"scrapper-bot/config"
-	dr "scrapper-bot/driver"
 	"scrapper-bot/entity"
+	dr "scrapper-bot/superservice/scrapper/apiDriver"
 )
 
 type scrapper struct {
@@ -15,26 +14,18 @@ type scrapper struct {
 	trackedStocks []entity.TrackedStock
 	StockChannel  chan entity.StockInfo
 	stopScrapping chan bool
-	logger        *logrus.Logger
 }
 
-func NewScrapper(config config.Config, lg *logrus.Logger) (Scrapper, error) {
+func NewScrapper(config config.Config) Scrapper {
 	s := scrapper{
 		StockChannel:  make(chan entity.StockInfo, 100),
 		stopScrapping: make(chan bool),
 		config:        config,
+		driver:        dr.NewApiDriver(config.TinkoffToken),
 		trackedStocks: config.StocksList,
-		logger:        lg,
 	}
 
-	var err error
-	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, lg)
-	if err != nil {
-		s.logger.Errorf("не удалось создать драйвер tinkoff api: %s", err.Error())
-		return scrapper{}, err
-	}
-
-	return s, nil
+	return s
 }
 
 // Запускает горутину скраппера.
@@ -44,17 +35,13 @@ func (s scrapper) Scrape(sleepTimeMs time.Duration) <-chan entity.StockInfo {
 		for {
 			select {
 			case <-s.stopScrapping:
-				close(s.StockChannel)
-				close(s.stopScrapping)
 				return
 
 			default:
 				for _, stock := range s.trackedStocks {
-					stockInfo, err := s.driver.GetStockInfo(stock.StockTag)
-					if err != nil {
-						s.logger.Errorf("Error getting stock info: %s", err.Error())
-					} else {
-						s.StockChannel <- stockInfo
+					stockInfo := s.driver.GetStockInfo(stock.StockTag)
+					if stockInfo != nil {
+						s.StockChannel <- *stockInfo
 					}
 				}
 			}
@@ -65,7 +52,6 @@ func (s scrapper) Scrape(sleepTimeMs time.Duration) <-chan entity.StockInfo {
 	return s.StockChannel
 }
 
-// Посылает сигнал для остановки скраппинга
 func (s *scrapper) StopScrape() {
 	s.stopScrapping <- true
 }
