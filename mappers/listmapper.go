@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-// mapper, который создаёт string в формате Markdown для сообщения телеграм
 var helloString = "Я бот, который просматривает аномальные объёмы по акциям:"
 
 func ToTelegramFormat(list []list.StockScrapeInfo) string {

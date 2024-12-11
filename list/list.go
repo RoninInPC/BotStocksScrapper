@@ -2,7 +2,6 @@ package list
 
 import "sync"
 
-// перенесём в Entity
 type StockScrapeInfo struct {
 	StockTag    string
 	AnomalySize uint64

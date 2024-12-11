@@ -4,7 +4,6 @@ import (
 	"github.com/and3rson/telemux/v2"
 )
 
-// можно сделать любую структуру с любыми аргументами, которые будут подставляться в Action
 type Action interface {
 	Action(u *telemux.Update)
 }
