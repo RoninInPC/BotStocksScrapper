@@ -1,7 +1,7 @@
-package impl
+package scrapper
 
 import (
-	"scrapper-bot/scrapper-service/entity"
+	"BotStocksScrapper/entity"
 )
 
 type Scrapper interface {

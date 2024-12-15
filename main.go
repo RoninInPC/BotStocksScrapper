@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"scrapper-bot/scrapper-service/scrapper/config"
-	"scrapper-bot/scrapper-service/scrapper/impl"
+	"scrapper-bot/config"
+	"scrapper-bot/service/scrapper"
 )
 
 func main() {
-	cfg, err := config.LoadConfig("./scrapper-service/scrapper/config/config.yaml")
+	cfg, err := config.LoadConfig("./BotStocksScrapper/config/config.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +31,9 @@ func main() {
 		FullTimestamp: true,
 		DisableColors: false,
 	})
-	scr, err := impl.NewScrapper(cfg, &lg)
+
+	cfg.
+		scr, err := impl.NewScrapper(cfg, &lg)
 	if err != nil {
 		panic(err)
 	}

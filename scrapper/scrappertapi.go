@@ -1,15 +1,15 @@
-package impl
+package scrapper
 
 import (
 	"github.com/sirupsen/logrus"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
-	"scrapper-bot/scrapper-service/entity"
-	"scrapper-bot/scrapper-service/scrapper/config"
-	dr "scrapper-bot/scrapper-service/scrapper/driver"
+
+	dr "BotStocksScrapper/driver"
+	"BotStocksScrapper/entity"
 )
 
-type scrapper struct {
-	config        config.Config
+type ScrapperTAPI struct {
+	config        entity.Config
 	driver        *dr.ApiDriver
 	trackedStocks []entity.TrackedStock
 	StockChannel  chan entity.StockInfo
@@ -17,20 +17,20 @@ type scrapper struct {
 	logger        *logrus.Logger
 }
 
-func NewScrapper(config config.Config, lg *logrus.Logger) (Scrapper, error) {
-	s := scrapper{
+func InitScrapper(config entity.Config) (Scrapper, error) {
+	s := ScrapperTAPI{
 		StockChannel:  make(chan entity.StockInfo, 100),
 		stopScrapping: make(chan bool),
 		config:        config,
-		trackedStocks: config.StocksList,
-		logger:        lg,
+		trackedStocks: entity.GetStocksInfoList(),
+		logger:        config.Logger,
 	}
 
 	var err error
-	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, lg)
+	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, config.Logger)
 	if err != nil {
 		s.logger.Errorf("не удалось создать драйвер tinkoff api: %s", err.Error())
-		return &scrapper{}, err
+		return &ScrapperTAPI{}, err
 	}
 
 	return &s, nil
@@ -38,7 +38,7 @@ func NewScrapper(config config.Config, lg *logrus.Logger) (Scrapper, error) {
 
 // Запускает горутину скраппера.
 // Возвращает канал в который приходят отловленные аномалии
-func (s *scrapper) Scrape() (<-chan entity.StockInfo, error) {
+func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 
 	stocks, err := s.driver.InitStocks(s.trackedStocks)
 	if err != nil {
@@ -73,23 +73,25 @@ func (s *scrapper) Scrape() (<-chan entity.StockInfo, error) {
 				stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
 				totalVolume := stockInfo.Stock.Price * float64(trade.Quantity) * float64(currentStock.MinLotCount)
 
-				if totalVolume >= currentStock.AnomalySize {
-					if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_BUY {
-						stockInfo.StockMove = entity.Buy
-					} else {
-						stockInfo.StockMove = entity.Sale
-					}
-					stockInfo.Stock.Ticker = currentStock.Ticker
-					stockInfo.Stock.FIGI = trade.Figi
-					stockInfo.Stock.UID = trade.GetInstrumentUid()
-					stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
-					stockInfo.Stock.Name = currentStock.Name
-					stockInfo.Stock.MinLotCount = currentStock.MinLotCount
-					stockInfo.Volume = totalVolume
-					stockInfo.NumberLots = trade.Quantity
-
-					s.StockChannel <- stockInfo
+				if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_BUY {
+					stockInfo.StockMove = entity.Buy
+				} else {
+					stockInfo.StockMove = entity.Sale
 				}
+				stockInfo.Stock.Ticker = currentStock.Ticker
+				stockInfo.Stock.FIGI = trade.Figi
+				stockInfo.Stock.UID = trade.GetInstrumentUid()
+				stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
+				stockInfo.Stock.Name = currentStock.Name
+				stockInfo.Stock.MinLotCount = currentStock.MinLotCount
+				stockInfo.Volume = totalVolume
+				stockInfo.NumberLots = trade.Quantity
+
+				if totalVolume >= currentStock.AnomalySize {
+					stockInfo.IsAnomaly = true
+				}
+
+				s.StockChannel <- stockInfo
 			}
 		}
 	}()
@@ -98,6 +100,6 @@ func (s *scrapper) Scrape() (<-chan entity.StockInfo, error) {
 }
 
 // Посылает сигнал для остановки скраппинга
-func (s *scrapper) StopScrape() {
+func (s *ScrapperTAPI) StopScrape() {
 	s.stopScrapping <- true
 }

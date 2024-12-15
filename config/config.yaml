@@ -1,0 +1,13 @@
+tinkoff-parameters:
+  AccountId: 237a944f-7956-44a3-8478-81ba34546f04
+  APIToken: t.-qfSgXeB-qXtuSAYGoGSXQYhOGvtFBFMMjtwcUWb23KgdDhxhlwoGiWBP8bTjKb6vo30dhvaRFSo4LUfM9L_og
+  EndPoint: invest-public-api.tinkoff.ru:443
+  AppName: invest-api-go-sdk
+  DisableResourceExhaustedRetry: false
+  DisableAllRetry: false
+  MaxRetries: 3
+tg-token: 7097380480:AAEu5s1B4Yp38UF-CrB3jVhn5qvKhiIF-2A
+redis:
+  address: 127.0.0.1
+  password: pass
+  db_number: 1

@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"BotStocksScrapper/entity"
 	"github.com/sirupsen/logrus"
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
-	"scrapper-bot/scrapper-service/entity"
 )
 
 type ApiDriver struct {
