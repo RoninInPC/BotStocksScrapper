@@ -2,8 +2,9 @@ package main
 
 import (
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"log"
+	"os"
+	"reddis/app/controller/cron"
 	"reddis/app/entity"
 	"reddis/app/repo/implementation"
 	"reddis/pkg/redis"
@@ -28,10 +29,14 @@ func main() {
 	} else {
 		log.Println("Failed to clear database")
 	}
+
+	cleaner := cron.NewRedisCleaner(redisRepo)
+
+	cron.StartCronService(cleaner)
 }
 
 func loadConfig(filename string) *entity.Config {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v", err)
 	}

@@ -3,7 +3,7 @@ package implementation
 import (
 	"context"
 	"github.com/redis/go-redis/v9"
-	"reddis/app/controller"
+	"reddis/app/controller/hash"
 	"reddis/app/repo"
 )
 
@@ -17,7 +17,7 @@ func NewRedisRepository(client *redis.Client) repo.RedisRepository {
 
 func (r *RedisRepository) Add(value string) bool {
 	ctx := context.Background()
-	key, err := controller.Hash(value)
+	key, err := hash.Hash(value)
 	if err != nil {
 		return false
 	}
