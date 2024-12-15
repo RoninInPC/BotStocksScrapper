@@ -1,4 +1,4 @@
-module scrapper-bot
+module BotStocksScrapper
 
 go 1.23.0
 
