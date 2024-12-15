@@ -6,7 +6,7 @@ import (
 
 	"github.com/tinkoff/invest-api-go-sdk/investgo"
 	"gopkg.in/yaml.v3"
-	"scrapper-bot/entity"
+	"scrapper-bot/scrapper-service/entity"
 )
 
 type Config struct {
@@ -14,8 +14,8 @@ type Config struct {
 	StocksList       []entity.TrackedStock `yaml:"tracked-stocks"`
 }
 
-func LoadConfig() (Config, error) {
-	file, err := os.Open("config.yaml")
+func LoadConfig(path string) (Config, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to open config file: %w", err)
 	}

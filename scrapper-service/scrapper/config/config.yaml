@@ -1,24 +1,24 @@
 tracked-stocks:
-  - ticker: "TCSG"
-    figi: "TCS00A107UL4"
-    anomaly-size: 8000000000
+  - ticker: "T"
+    figi: "TCS80A107UL4"
+    anomaly-size: 100000
   - ticker: "LKOH"
     figi: "BBG004731032"
-    anomaly-size: 8000000000
+    anomaly-size: 100000.0
   - ticker: "SBER"
     figi: "BBG004730N88"
-    anomaly-size: 8000000000
+    anomaly-size: 100000.0
   - ticker: "GAZP"
     figi: "BBG004730RP0"
-    anomaly-size: 8000000000
+    anomaly-size: 100000.0
   - ticker: "ROSN"
     figi: "BBG004731354"
-    anomaly-size: 7000000000
+    anomaly-size: 100000.0
   - ticker: "NVTK"
     figi: "BBG00475KKY8"
-    anomaly-size: 8000000000
+    anomaly-size: 100000.0
 tinkoff-parameters:
-  AccountId: 237a944f-7956-44a3-8478-81ba34546f04
+  AccountId: 2067395489
   APIToken: t.-qfSgXeB-qXtuSAYGoGSXQYhOGvtFBFMMjtwcUWb23KgdDhxhlwoGiWBP8bTjKb6vo30dhvaRFSo4LUfM9L_og
   EndPoint: invest-public-api.tinkoff.ru:443
   AppName: invest-api-go-sdk

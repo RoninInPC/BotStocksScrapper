@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"scrapper-bot/config"
-	"scrapper-bot/scrapper"
+	"scrapper-bot/scrapper-service/scrapper/config"
+	"scrapper-bot/scrapper-service/scrapper/impl"
 )
 
 func main() {
-	cfg, err := config.LoadConfig()
+	cfg, err := config.LoadConfig("./scrapper-service/scrapper/config/config.yaml")
 	if err != nil {
 		panic(err)
 	}
 
-	file, err := os.Open("logs.txt")
+	file, err := os.OpenFile("logs.txt", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -31,25 +31,38 @@ func main() {
 		FullTimestamp: true,
 		DisableColors: false,
 	})
-	scr, err := scrapper.NewScrapper(cfg, &lg)
+	scr, err := impl.NewScrapper(cfg, &lg)
 	if err != nil {
 		panic(err)
 	}
 
-	stockChannel := scr.Scrape(10 * time.Second)
+	stockChannel, err := scr.Scrape(10 * time.Second)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	go func() {
+		time.Sleep(1 * time.Minute)
+		scr.StopScrape()
+		return
+	}()
 
 	for stock := range stockChannel {
 		fmt.Printf("\n################################\n\tПолучена аномалия\n")
-		fmt.Printf("NAME: %s\n", stock.Stock.Name)
-		fmt.Printf("TICKER: %s\n", stock.Stock.Tag)
+		fmt.Printf("TICKER: 			%s\n", stock.Stock.Ticker)
+		fmt.Printf("FIGI: 				%s\n", stock.Stock.FIGI)
+		fmt.Printf("UID: 				%s\n", stock.Stock.UID)
+		fmt.Printf("Name: 				%s\n", stock.Stock.Name)
 		fmt.Printf("\tДанные аномалии:\n")
-		fmt.Printf("Цена: %f\n", stock.Price)
-		fmt.Printf("Объем: %f\n", stock.Volume)
-		fmt.Printf("Изменение на объеме: %s\n", stock.VolumeChange)
-		fmt.Printf("Движение: %s\n", stock.StockMove)
-		fmt.Printf("Итого за день:\n")
+		fmt.Printf("Цена: 				%f\n", stock.Stock.Price)
+		fmt.Printf("Объем: 				%f\n", stock.Volume)
+		fmt.Printf("Количество лотов: 	%d\n", stock.NumberLots)
+		fmt.Printf("Движение: 			%s\n", stock.StockMove)
+		fmt.Printf("Временная метка: 	%s\n", time.Now().String())
+		/*fmt.Printf("Итого за день:\n")
 		fmt.Printf("Изменение цены: %f\n", stock.PriceChangePerDay)
 		fmt.Printf("Покупки: %f %f\n", stock.PurchasesPerDay, stock.PurchasesPerDayVolume)
-		fmt.Printf("Продажи: %f %f\n", stock.SalesPerDay, stock.SalesPerDayVolume)
+		fmt.Printf("Продажи: %f %f\n", stock.SalesPerDay, stock.SalesPerDayVolume)*/
 	}
 }
