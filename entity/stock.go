@@ -84,12 +84,12 @@ type TradeStream struct {
 
 var lock sync.Mutex
 var trackedStocks = []TrackedStock{
-	{"LKOH", "BBG004731032", 80000000},
-	{"SBER", "BBG004730N88", 80000000},
-	{"GAZP", "BBG004730RP0", 80000000},
-	{"ROSN", "BBG004731354", 70000000},
-	{"NVTK", "BBG00475KKY8", 80000000},
-	{"T", "TCS80A107UL4", 80000000},
+	{"LKOH", "BBG004731032", 8000000},
+	{"SBER", "BBG004730N88", 8000000},
+	{"GAZP", "BBG004730RP0", 8000000},
+	{"ROSN", "BBG004731354", 7000000},
+	{"NVTK", "BBG00475KKY8", 8000000},
+	{"T", "TCS80A107UL4", 8000000},
 }
 
 // шиза на счёт гонки данных scrapper-ом и командой бота

@@ -43,6 +43,8 @@ func (s *ScrapperService) Scrap() error {
 	for {
 		select {
 		case <-s.stopChan:
+			s.stockScrapper.StopScrape()
+			s.logger.Info("Остановлен сервис скраппера")
 			return nil
 
 		case stockInfo := <-stockChannel:
@@ -52,11 +54,11 @@ func (s *ScrapperService) Scrap() error {
 
 			if stockInfo.IsAnomaly {
 				err = s.sender.SendMsg(stockInfo)
-			}
-			if err != nil {
-				s.logger.Errorf("Ошибка отправки сообщения в канал: %s", err.Error())
-			} else {
-				s.logger.Infof("Успешно отправлена аномалия в чат: %v", stockInfo)
+				if err != nil {
+					s.logger.Errorf("Ошибка отправки сообщения в канал: %s", err.Error())
+				} else {
+					s.logger.Infof("Успешно отправлена аномалия в чат: %v", stockInfo)
+				}
 			}
 		}
 	}

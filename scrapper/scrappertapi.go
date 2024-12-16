@@ -1,7 +1,6 @@
 package scrapper
 
 import (
-	"github.com/sirupsen/logrus"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
 
 	dr "BotStocksScrapper/driver"
@@ -14,7 +13,7 @@ type ScrapperTAPI struct {
 	trackedStocks []entity.TrackedStock
 	StockChannel  chan entity.StockInfo
 	stopScrapping chan bool
-	logger        *logrus.Logger
+	logger        entity.Logger
 }
 
 func InitScrapper(config entity.Config) (Scrapper, error) {
@@ -59,6 +58,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				close(s.StockChannel)
 				close(s.stopScrapping)
 				tradeStream.Stream.Stop()
+				s.logger.Infof("Скраппер остановлен")
 				return
 
 			case trade := <-tradeStream.Channel:
@@ -89,6 +89,8 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 
 				if totalVolume >= currentStock.AnomalySize {
 					stockInfo.IsAnomaly = true
+					s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f STOCK MOVE: %s\n",
+						stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.StockMove)
 				}
 
 				s.StockChannel <- stockInfo

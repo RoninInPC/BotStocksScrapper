@@ -1,38 +1,23 @@
 package main
 
 import (
-	"io"
-	"os"
 	"time"
 
 	"BotStocksScrapper/config"
+	"BotStocksScrapper/entity"
 	"BotStocksScrapper/service/scrapper"
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	cfg, err := config.LoadConfig("./BotStocksScrapper/config/config.yaml")
+	cfg, err := config.LoadConfig("./config/config.yaml")
 	if err != nil {
 		panic(err)
 	}
 
-	file, err := os.OpenFile("logs.txt", os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		panic(err)
-	}
+	// Инициализируем логер
+	cfg.Logger = entity.NewLogger()
 
-	writer := io.MultiWriter(os.Stdout, file)
-	lg := logrus.Logger{}
-	lg.SetOutput(writer)
-	lg.SetLevel(logrus.DebugLevel)
-	lg.SetReportCaller(true)
-	lg.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		DisableColors: false,
-	})
-
-	cfg.Logger = &lg
-
+	// Запускаем сервис скраппера
 	// Указать вторым параметром клиент телеги, третьим ID чата
 	scrservice, err := scrapper.NewScrapperService(cfg, nil, 0)
 	if err != nil {

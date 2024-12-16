@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"BotStocksScrapper/entity"
-	"github.com/sirupsen/logrus"
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
 )
 
@@ -20,17 +19,16 @@ type ApiDriver struct {
 	marketStreamClient *tsdk.MarketDataStreamClient
 	operationsClient   *tsdk.OperationsServiceClient
 	ctx                context.Context
-	logger             *logrus.Logger
+	logger             entity.Logger
 }
 
-func NewApiDriver(cfg tsdk.Config, lg *logrus.Logger) (*ApiDriver, error) {
+func NewApiDriver(cfg tsdk.Config, lg entity.Logger) (*ApiDriver, error) {
 	driver := &ApiDriver{
 		config: cfg,
 		logger: lg,
 	}
 
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-	//defer cancel()
 	driver.ctx = ctx
 
 	var err error

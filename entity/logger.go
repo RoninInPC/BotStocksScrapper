@@ -1,5 +1,12 @@
 package entity
 
+import (
+	"io"
+	"os"
+
+	"github.com/sirupsen/logrus"
+)
+
 type Logger interface {
 	Tracef(format string, args ...interface{})
 	Debugf(format string, args ...interface{})
@@ -30,4 +37,23 @@ type Logger interface {
 	Panicln(args ...interface{})
 	Exit(code int)
 	SetNoLock()
+}
+
+func NewLogger() Logger {
+	file, err := os.OpenFile("logs.txt", os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	writer := io.MultiWriter(os.Stdout, file)
+	lg := logrus.Logger{}
+	lg.SetOutput(writer)
+	lg.SetLevel(logrus.DebugLevel)
+	lg.SetReportCaller(true)
+	lg.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+		DisableColors: false,
+	})
+
+	return &lg
 }
