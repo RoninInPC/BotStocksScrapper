@@ -1,4 +1,4 @@
-package repo
+package logBase
 
 type RedisRepository interface {
 	Add(key string) bool

@@ -6,41 +6,46 @@ import (
 	"os"
 	"reddis/app/controller/cron"
 	"reddis/app/entity"
-	"reddis/app/repo/implementation"
+	"reddis/app/repo/changeBase/impl"
+	"reddis/app/repo/logBase/implLogBase"
+	"reddis/app/usecase"
 )
 
 func main() {
 	config := loadConfig("config/config.yml")
 
-	redisClient := implementation.NewRedisClient(config.Redis)
+	redisClient := implLogBase.NewRedisClient(config.Redis.LogBase)
+	changeBaseClient := impl.NewChangeBaseClient(config.Redis.ChangeBase)
 
-	redisRepo := implementation.NewRedisRepository(redisClient)
+	logBaseRepo := implLogBase.NewRedisRepository(redisClient)
+	changeBaseRepo := impl.NewChangeBaseRedisRepository(changeBaseClient)
 
-	if redisRepo.Add("mykey") {
-		log.Println("String added successfully")
+	if logBaseRepo.Add("mykey") {
+		log.Println("String added successfully to LogBase")
 	} else {
-		log.Println("String already exists or failed to add")
+		log.Println("String already exists or failed to add to LogBase")
 	}
 
-	if redisRepo.Free() {
-		log.Println("Database cleared successfully")
+	stock := entity.StockAdd{
+		StockName: "AAPL",
+		Type:      "SALE",
+		NumPrice:  100,
+	}
+	if changeBaseRepo.Add(stock) {
+		log.Println("Stock info added successfully to ChangeBase")
 	} else {
-		log.Println("Failed to clear database")
+		log.Println("Failed to add stock info to ChangeBase")
 	}
 
-	cleaner := cron.NewRedisCleaner(redisRepo)
+	sum := changeBaseRepo.Get("AAPL", "SALE")
+	log.Printf("Total SALE for AAPL: %d\n", sum)
+
+	cleaner := usecase.NewDatabaseCleaner(logBaseRepo, changeBaseRepo)
 
 	tasks := []cron.Task{
 		{
-			Schedule: "0 3 * * *",
+			Schedule: "0 3 * * *", // Каждый день в 3:00 утра
 			Action:   cleaner.Clean,
-		},
-		{
-			Schedule: "0 15 * * *",
-			Action: func() error {
-				log.Println("Running another task at 15:00")
-				return nil
-			},
 		},
 	}
 

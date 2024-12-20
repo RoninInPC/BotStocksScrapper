@@ -1,14 +1,14 @@
-package implementation
+package implLogBase
 
 import (
 	"context"
 	"github.com/redis/go-redis/v9"
 	"reddis/app/controller/hash"
 	"reddis/app/entity"
-	"reddis/app/repo"
+	"reddis/app/repo/logBase"
 )
 
-func NewRedisClient(config entity.RedisConfig) *redis.Client {
+func NewRedisClient(config entity.RedisDBConfig) *redis.Client {
 	return redis.NewClient(&redis.Options{
 		Addr:     config.Addr,
 		Password: config.Password,
@@ -16,12 +16,11 @@ func NewRedisClient(config entity.RedisConfig) *redis.Client {
 	})
 }
 
-
 type RedisRepository struct {
 	client *redis.Client
 }
 
-func NewRedisRepository(client *redis.Client) repo.RedisRepository {
+func NewRedisRepository(client *redis.Client) logBase.RedisRepository {
 	return &RedisRepository{client: client}
 }
 
