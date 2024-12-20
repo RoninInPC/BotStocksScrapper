@@ -8,20 +8,30 @@ import (
 	"syscall"
 )
 
-func StartCronService(cleaner *RedisCleaner) {
+type Task struct {
+	Schedule string
+	Action   func() error
+}
+
+type Service struct {
+	Tasks []Task
+}
+
+func (s *Service) Cron() {
 	c := cron.New()
 
-	// Добавление задачи в крон (например, каждый день в 3:00 утра)
-	_, err := c.AddFunc("0 3 * * *", func() {
-		err := cleaner.Clean()
+	for _, task := range s.Tasks {
+		_, err := c.AddFunc(task.Schedule, func() {
+			err := task.Action()
+			if err != nil {
+				log.Printf("Task failed: %v", err)
+			} else {
+				log.Println("Task completed successfully")
+			}
+		})
 		if err != nil {
-			log.Printf("Failed to clean Redis: %v", err)
-		} else {
-			log.Println("Redis cleaned successfully")
+			log.Fatalf("Failed to add cron job: %v", err)
 		}
-	})
-	if err != nil {
-		log.Fatalf("Failed to add cron job: %v", err)
 	}
 
 	c.Start()
@@ -30,9 +40,11 @@ func StartCronService(cleaner *RedisCleaner) {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	log.Println("Cron service started in the background.")
+
 	<-stop
 
 	log.Println("Shutting down...")
+
 	c.Stop()
 
 	log.Println("Cron service stopped. Exiting.")

@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-
 	config := loadConfig("config/config.yml")
 
 	redisClient := implementation.NewRedisClient(config.Redis)
@@ -31,7 +30,25 @@ func main() {
 
 	cleaner := cron.NewRedisCleaner(redisRepo)
 
-	cron.StartCronService(cleaner)
+	tasks := []cron.Task{
+		{
+			Schedule: "0 3 * * *",
+			Action:   cleaner.Clean,
+		},
+		{
+			Schedule: "0 15 * * *",
+			Action: func() error {
+				log.Println("Running another task at 15:00")
+				return nil
+			},
+		},
+	}
+
+	cronService := cron.Service{
+		Tasks: tasks,
+	}
+
+	cronService.Cron()
 }
 
 func loadConfig(filename string) *entity.Config {
