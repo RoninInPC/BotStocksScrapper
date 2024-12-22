@@ -1,6 +1,8 @@
 package scrapper
 
 import (
+	"time"
+
 	"BotStocksScrapper/entity"
 	sc "BotStocksScrapper/scrapper"
 	"BotStocksScrapper/sender"
@@ -26,6 +28,7 @@ func NewScrapperService(cfg entity.Config, tgClient *tgbotapi.BotAPI, chatID int
 
 	return ScrapperService{
 		stockScrapper: scrapper,
+		stopChan:      make(chan bool),
 		sender:        sender,
 		logger:        cfg.Logger,
 		db:            nil,
@@ -47,7 +50,11 @@ func (s *ScrapperService) Scrap() error {
 			s.logger.Info("Остановлен сервис скраппера")
 			return nil
 
-		case stockInfo := <-stockChannel:
+		case stockInfo, ok := <-stockChannel:
+			if !ok {
+				s.logger.Warn("Канал скраппера закрыт")
+				return nil
+			}
 			if stockInfo.IsAnomaly {
 				err = s.sender.SendMsg(stockInfo)
 				if err != nil {
@@ -62,4 +69,5 @@ func (s *ScrapperService) Scrap() error {
 
 func (s *ScrapperService) Stop() {
 	s.stopChan <- true
+	time.Sleep(2 * time.Second)
 }

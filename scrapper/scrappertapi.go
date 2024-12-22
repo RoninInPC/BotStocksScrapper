@@ -143,5 +143,6 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 
 // Посылает сигнал для остановки скраппинга
 func (s *ScrapperTAPI) StopScrape() {
+	s.logger.Info("Скраппером получен сигнал на остановку")
 	s.stopScrapping <- true
 }

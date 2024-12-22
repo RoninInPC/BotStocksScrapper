@@ -35,6 +35,6 @@ func main() {
 
 	go scrservice.Scrap()
 
-	time.Sleep(1 * time.Minute)
+	time.Sleep(10 * time.Second)
 	scrservice.Stop()
 }
