@@ -1,11 +1,14 @@
 package main
 
 import (
+	"io"
+	"os"
 	"time"
 
 	"BotStocksScrapper/config"
 	"BotStocksScrapper/entity"
 	"BotStocksScrapper/service/scrapper"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -15,7 +18,13 @@ func main() {
 	}
 
 	// Инициализируем логер
-	cfg.Logger = entity.NewLogger()
+	file, err := os.OpenFile("logs.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	writer := io.MultiWriter(os.Stdout, file)
+	cfg.Logger = entity.NewLogger(writer, logrus.DebugLevel)
 
 	// Запускаем сервис скраппера
 	// Указать вторым параметром клиент телеги, третьим ID чата
@@ -28,5 +37,4 @@ func main() {
 
 	time.Sleep(1 * time.Minute)
 	scrservice.Stop()
-
 }

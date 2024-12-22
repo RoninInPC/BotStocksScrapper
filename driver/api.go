@@ -122,8 +122,14 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 
 	// Получаем расписание текущей биржи инструмента
 	rsp, err := d.instrumentsClient.TradingSchedules(stock.Stock.Exchange, time.Now(), time.Now())
-	if err != nil || rsp.Exchanges == nil {
-		return errors.New("Ошибка получения расписания биржи. Невозможно получить данные")
+	if err != nil {
+		d.logger.Errorf("Ошибка получения расписания для биржи %s: %s", stock.Stock.Exchange, err.Error())
+		return errors.New("Ошибка получения расписания биржи.")
+	}
+
+	if rsp.Exchanges == nil {
+		d.logger.Errorf("Отсутствует расписание для биржи %s в ответе API", stock.Stock.Exchange)
+		return errors.New("Отсутствует расписание для биржи.")
 	}
 	exch := rsp.GetExchanges()[0]
 
@@ -131,6 +137,7 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 	for _, day := range exch.GetDays() {
 		if day.Date.AsTime().Year() == time.Now().Year() && day.Date.AsTime().YearDay() == time.Now().YearDay() {
 			if !day.IsTradingDay {
+				d.logger.Warnf("Биржа %s закрыта. Данные не заполнены", stock.Stock.Exchange)
 				return errors.New("Биржа закрыта. Невозможно получить данные")
 			} else {
 				exchStartTime = day.StartTime.AsTime()
@@ -141,9 +148,13 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 
 	// Получаем свечи инструмента с момента открытия торгового дня
 	response, err := d.marketClient.GetCandles(stock.Stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_30_MIN, exchStartTime, exchEndTime)
-	if err != nil || response.Candles == nil {
+	if err != nil {
 		d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Stock.Name, stock.Stock.Ticker, err.Error())
 		return err
+	}
+	if response.Candles == nil {
+		d.logger.Errorf("Для инструмента %s:%s нет свечей", stock.Stock.Name, stock.Stock.Ticker)
+		return errors.New("Пустой массив свечей. Информация об акции не заполнена.")
 	}
 
 	candle := response.GetCandles()[0]
@@ -164,13 +175,17 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 	today := time.Now()
 	if today.Weekday() == time.Saturday || today.Weekday() == time.Sunday {
 		stock.PerDayPriceChange = math.Round(((stock.Stock.Price-lastPrice)/lastPrice)*10000) / 100
+		d.logger.Info("Выходной день. Процент изменения цены вычисляется по формуле выходного дня")
 	} else {
+		d.logger.Info("Рабочий день. Процент изменения цены вычисляется по формуле рабочего дня")
 		stock.PerDayPriceChange = math.Round(((stock.Stock.Price-openPrice)/openPrice)*10000) / 100
 	}
 
-	for _, candle := range response.GetCandles() {
+	var i int
+	for i, candle = range response.GetCandles() {
 		stock.PerDayVolume += candle.Volume
 	}
+	d.logger.Infof("Обработано %d свечей для акции %s:%s", i, stock.Stock.Name, stock.Stock.Ticker)
 
 	return nil
 }

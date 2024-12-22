@@ -46,6 +46,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 		s.logger.Errorf("Не удалось инициализировать акции: %s", err.Error())
 		return s.StockChannel, err
 	}
+	s.logger.Debug("Инициализация акций прошла успешно")
 
 	tradeStream, err := s.driver.GetTradeCh(stocks)
 	if err != nil {
@@ -55,6 +56,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 	if !tradeStream.IsListen {
 		return nil, errors.New("не удалось запустить прослушивание стрима драйвера")
 	}
+	s.logger.Debug("Драйвер успешно подписался на обновления обезличенных сделок")
 
 	go func() {
 		for {
@@ -94,11 +96,22 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				stockInfo.Volume = totalVolume
 				stockInfo.LotsCount = trade.Quantity
 
+				s.logger.Infof("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+					stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
+
 				if totalVolume >= currentStock.AnomalySize {
 					stockInfo.IsAnomaly = true
 					s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
 						stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
 					err = s.driver.GetPerDayStatistics(&stockInfo)
+					if err != nil {
+						s.logger.Errorf("Ошибка получения доп.информации об акции: %s", err.Error())
+						s.logger.Errorf("Информация об акции: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+							stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
+
+					} else {
+						s.logger.Info("Аномалия успешно обработана")
+					}
 
 					// TODO
 					//  Получаем из бд все сделки к текущему моменту
