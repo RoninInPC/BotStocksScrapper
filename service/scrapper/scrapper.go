@@ -48,10 +48,6 @@ func (s *ScrapperService) Scrap() error {
 			return nil
 
 		case stockInfo := <-stockChannel:
-			// TODO Добавляем в бд сделку
-			//  Получаем из бд все сделки к текущему моменту
-			//  Дозаполняем StockInfo
-
 			if stockInfo.IsAnomaly {
 				err = s.sender.SendMsg(stockInfo)
 				if err != nil {

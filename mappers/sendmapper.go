@@ -16,7 +16,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 	}
 
 	answerBody := fmt.Sprintf("Цена: %f₽\n", stock.Stock.Price)
-	answerBody += fmt.Sprintf("Объем: %f[%d лотов]\n", stock.Volume, stock.NumberLots)
+	answerBody += fmt.Sprintf("Объем: %f[%d лотов]\n", stock.Volume, stock.LotsCount)
 	answerBody += fmt.Sprintf("Изменение на объеме: %f%%\n", stock.VolumeChange)
 	if stock.StockMove == entity.Sale {
 		answerBody += fmt.Sprintf("Тип: продажа\n")

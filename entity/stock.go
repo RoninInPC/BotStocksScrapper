@@ -15,6 +15,17 @@ const (
 	Buy  StockMoveType = "Buy"
 )
 
+type MarketType string
+
+const (
+	Tinkoff MarketType = "TQBR"
+	Moscow  MarketType = "MOEX"
+)
+
+func (m MarketType) String() string {
+	return string(m)
+}
+
 // Stock Структура описывающая акцию. Содержит базовую информацию об акции
 //
 // Name - Имя акции (Например 'Тинькофф акции')
@@ -23,38 +34,41 @@ const (
 // UID - Уникальный идентификкатор инструмента внутри Tinkoff API
 // MinLotCount - Минимальное количество акций для торгов (количество акций в лоте)
 // Price - Цена одной акции
+// AnomalySize - Объем от которого сделка считается аномальной
 type Stock struct {
-	Name        string
-	Ticker      string
-	FIGI        string
-	UID         string
-	MinLotCount int
-	Price       float64
-	AnomalySize float64
+	Name         string
+	Ticker       string
+	FIGI         string
+	UID          string
+	MinLotCount  int
+	RealExchange string
+	Exchange     string
+	Price        float64
+	AnomalySize  float64
 }
 
 // Структура описывающая аномалию.
 // Содержит информацию об акции и параметрах аномалии.
 //
 // Stock - Базовая информация об акции
-// Volume - Объем аномалии в копейках
+// Volume - Объем аномалии
 // VolumeChange - Изменение на объеме в процентах
-// NumberLots - Количесво лотов в аномалии
+// LotsCount - Количесво лотов в аномалии
 // StockMove - Тип аномалии покупка/продажа
-// PerDayVolume - Общий объем продаж и покупок за день
+// PerDayVolume - Общий объем продаж и покупок за день. Выражается в количестве лотов.
 // PerDayPriceChange - Изменение цены за день
-// PerDaySalesVolume - Объем продаж за день
+// PerDaySalesVolume - Объем продаж за день (в кол-ве лотов)
 // PerDaySalesPercent - Процент продаж за день от общего объема
-// PerDayBuysVolume - Общий объем покупок за день
+// PerDayBuysVolume - Объем покупок за день (в кол-ве лотов)
 // PerDayBuysPercent - Процент покупок за день от общего объема
 type StockInfo struct {
 	Stock              Stock
 	Volume             float64
 	VolumeChange       float64
-	NumberLots         int64
+	LotsCount          int64
 	StockMove          StockMoveType
 	IsAnomaly          bool
-	PerDayVolume       float64
+	PerDayVolume       int64
 	PerDayPriceChange  float64
 	PerDaySalesVolume  float64
 	PerDaySalesPercent float64
@@ -64,8 +78,8 @@ type StockInfo struct {
 
 // Возвращает строку от StockInfo
 func (s *StockInfo) String() string {
-	return fmt.Sprintf("Name:%s;Ticker:%s;FIGI:%s;UID:%s;Price:%d;Volume:%d;NumberLots:%d;StockMove:%s",
-		s.Stock.Name, s.Stock.Ticker, s.Stock.FIGI, s.Stock.UID, s.Stock.Price, s.Volume, s.NumberLots, s.StockMove)
+	return fmt.Sprintf("Name:%s;Ticker:%s;FIGI:%s;UID:%s;Price:%d;Volume:%d;LotsCount:%d;StockMove:%s",
+		s.Stock.Name, s.Stock.Ticker, s.Stock.FIGI, s.Stock.UID, s.Stock.Price, s.Volume, s.LotsCount, s.StockMove)
 }
 
 // Отслеживаемые акции
@@ -84,12 +98,12 @@ type TradeStream struct {
 
 var lock sync.Mutex
 var trackedStocks = []TrackedStock{
-	{"LKOH", "BBG004731032", 8000000},
-	{"SBER", "BBG004730N88", 8000000},
-	{"GAZP", "BBG004730RP0", 8000000},
-	{"ROSN", "BBG004731354", 7000000},
-	{"NVTK", "BBG00475KKY8", 8000000},
-	{"T", "TCS80A107UL4", 8000000},
+	{"LKOH", "BBG004731032", 80000000},
+	{"SBER", "BBG004730N88", 80000000},
+	{"GAZP", "BBG004730RP0", 80000000},
+	{"ROSN", "BBG004731354", 70000000},
+	{"NVTK", "BBG00475KKY8", 80000000},
+	{"T", "TCS80A107UL4", 80000000},
 }
 
 // шиза на счёт гонки данных scrapper-ом и командой бота

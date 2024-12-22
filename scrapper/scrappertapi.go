@@ -1,6 +1,8 @@
 package scrapper
 
 import (
+	"errors"
+
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
 
 	dr "BotStocksScrapper/driver"
@@ -50,6 +52,9 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 		s.logger.Errorf("ошибка создания стрима обезличенных сделок: %s", err.Error())
 		return s.StockChannel, err
 	}
+	if !tradeStream.IsListen {
+		return nil, errors.New("не удалось запустить прослушивание стрима драйвера")
+	}
 
 	go func() {
 		for {
@@ -84,14 +89,36 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
 				stockInfo.Stock.Name = currentStock.Name
 				stockInfo.Stock.MinLotCount = currentStock.MinLotCount
+				stockInfo.Stock.Exchange = currentStock.Exchange
+				stockInfo.Stock.RealExchange = currentStock.RealExchange
 				stockInfo.Volume = totalVolume
-				stockInfo.NumberLots = trade.Quantity
+				stockInfo.LotsCount = trade.Quantity
 
 				if totalVolume >= currentStock.AnomalySize {
 					stockInfo.IsAnomaly = true
-					s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f STOCK MOVE: %s\n",
-						stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.StockMove)
+					s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+						stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
+					err = s.driver.GetPerDayStatistics(&stockInfo)
+
+					// TODO
+					//  Получаем из бд все сделки к текущему моменту
+					//  Дозаполняем StockInfo
+					//   Дозаполняем поля
+					//    PerDaySalesVolume  float64
+					//	  PerDaySalesPercent float64
+					//	  PerDayBuysVolume   float64
+					//	  PerDayBuysPercent  float64
+					// PerDayBuysVolume сумма всех лотов сделок на покупку
+					// allStocks = db.GetAllStocksInfo(stockInfo.String()) -> []StockInfo
+					// for _, stock := range allStocks
+					//		if stock.StockMove == entity.Buy {
+					//			stockInfo.PerDayBuysVolume += stock.LotsCount
+					//		}
+					//  stockInfo.PerDaySalesVolume = stockInfo.PerDayVolume - stockInfo.PerDayBuysVolume
+					//  stockInfo.PerDaySalesPercent / stockInfo.PerDaySalesPercent - это просто процентное соотношение от общей суммы (stockInfo.PerDayVolume)
+					//
 				}
+				// TODO Добавляем в бд информацию о сделке
 
 				s.StockChannel <- stockInfo
 			}
