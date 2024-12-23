@@ -2,8 +2,6 @@ package entity
 
 import (
 	"fmt"
-	"sync"
-
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
 )
@@ -96,21 +94,8 @@ type TradeStream struct {
 	IsListen bool                    // Флаг успешного запуска. Необходимо проверять перед началом прослушивания канала
 }
 
-var lock sync.Mutex
-var trackedStocks = []TrackedStock{
-	{"LKOH", "BBG004731032", 80000000},
-	{"SBER", "BBG004730N88", 80000000},
-	{"GAZP", "BBG004730RP0", 80000000},
-	{"ROSN", "BBG004731354", 70000000},
-	{"NVTK", "BBG00475KKY8", 800},
-	{"T", "TCS80A107UL4", 80000000},
-}
-
-// шиза на счёт гонки данных scrapper-ом и командой бота
-func GetStocksInfoList() []TrackedStock {
-	lock.Lock()
-	defer lock.Unlock()
-	answer := make([]TrackedStock, len(trackedStocks))
-	copy(answer, trackedStocks)
-	return answer
+type StockAdd struct {
+	StockName string
+	Type      string // SALE или BUY
+	NumPrice  int64
 }

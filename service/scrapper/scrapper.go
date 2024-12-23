@@ -1,18 +1,19 @@
 package scrapper
 
 import (
+	"BotStocksScrapper/sender"
+	"BotStocksScrapper/sender/telegram"
 	"time"
 
 	"BotStocksScrapper/entity"
 	sc "BotStocksScrapper/scrapper"
-	"BotStocksScrapper/sender"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type ScrapperService struct {
 	stockScrapper sc.Scrapper
 	stopChan      chan bool
-	sender        *sender.Sender
+	sender        sender.Sender[entity.StockInfo]
 	logger        entity.Logger
 	db            any
 	// TODO добавить поле сущность бд
@@ -24,12 +25,10 @@ func NewScrapperService(cfg entity.Config, tgClient *tgbotapi.BotAPI, chatID int
 		return ScrapperService{}, err
 	}
 
-	sender := sender.NewSender(tgClient, chatID)
-
 	return ScrapperService{
 		stockScrapper: scrapper,
 		stopChan:      make(chan bool),
-		sender:        sender,
+		sender:        telegram.NewSender(tgClient, chatID),
 		logger:        cfg.Logger,
 		db:            nil,
 	}, nil
@@ -56,7 +55,7 @@ func (s *ScrapperService) Scrap() error {
 				return nil
 			}
 			if stockInfo.IsAnomaly {
-				err = s.sender.SendMsg(stockInfo)
+				err = s.sender.Send(stockInfo)
 				if err != nil {
 					s.logger.Errorf("Ошибка отправки сообщения в канал: %s", err.Error())
 				} else {

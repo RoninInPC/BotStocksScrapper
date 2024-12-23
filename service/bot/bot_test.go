@@ -1,4 +1,4 @@
-package botservice
+package bot
 
 import (
 	"BotStocksScrapper/telegram"

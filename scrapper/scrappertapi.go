@@ -1,6 +1,7 @@
 package scrapper
 
 import (
+	"BotStocksScrapper/list"
 	"errors"
 
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
@@ -12,7 +13,7 @@ import (
 type ScrapperTAPI struct {
 	config        entity.Config
 	driver        *dr.ApiDriver
-	trackedStocks []entity.TrackedStock
+	trackedStocks []list.StockScrapeInfo
 	StockChannel  chan entity.StockInfo
 	stopScrapping chan bool
 	logger        entity.Logger
@@ -23,7 +24,7 @@ func InitScrapper(config entity.Config) (Scrapper, error) {
 		StockChannel:  make(chan entity.StockInfo, 100),
 		stopScrapping: make(chan bool),
 		config:        config,
-		trackedStocks: entity.GetStocksInfoList(),
+		trackedStocks: list.GetStocksInfoList(),
 		logger:        config.Logger,
 	}
 

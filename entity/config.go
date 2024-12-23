@@ -14,7 +14,12 @@ type Config struct {
 
 // Структура конфига для БД Redis
 type RedisConfig struct {
-	Address  string `json:"address"`
-	Password string `json:"password"`
-	DbNumber int    `json:"db_number"`
+	LogBase    RedisDBConfig `yaml:"logBase"`
+	ChangeBase RedisDBConfig `yaml:"changeBase"`
+}
+
+type RedisDBConfig struct {
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }

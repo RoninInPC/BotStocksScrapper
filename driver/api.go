@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"BotStocksScrapper/list"
 	"context"
 	"errors"
 	"fmt"
@@ -50,13 +51,13 @@ func NewApiDriver(cfg tsdk.Config, lg entity.Logger) (*ApiDriver, error) {
 
 // Инициализирует отслеживаемые акции.
 // Заполняет поля структур entity.Stock для дальнейшего использования внутри драйвера
-func (d *ApiDriver) InitStocks(trackedStocks []entity.TrackedStock) ([]entity.Stock, error) {
+func (d *ApiDriver) InitStocks(trackedStocks []list.StockScrapeInfo) ([]entity.Stock, error) {
 	stocks := []entity.Stock{}
 
 	for _, stock := range trackedStocks {
-		response, err := d.instrumentsClient.ShareByFigi(stock.FIGI)
+		response, err := d.instrumentsClient.ShareByFigi(stock.Figi)
 		if err != nil || response == nil {
-			d.logger.Errorf("не удалось получить ID инструмента по FIGI <%s>: %s", stock.FIGI, err.Error())
+			d.logger.Errorf("не удалось получить ID инструмента по FIGI <%s>: %s", stock.Figi, err.Error())
 			return nil, err
 		}
 
