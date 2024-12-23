@@ -1,10 +1,10 @@
 package impl
 
 import (
-	"BotStocksScrapper/app/entity"
-	entity2 "BotStocksScrapper/entity"
 	"context"
 	"fmt"
+
+	"BotStocksScrapper/entity"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -23,7 +23,7 @@ func NewChangeBaseRedisRepository(client *redis.Client) *ChangeBaseRedisReposito
 	return &ChangeBaseRedisRepository{client: client}
 }
 
-func (r *ChangeBaseRedisRepository) Add(stock entity2.StockAdd) bool {
+func (r *ChangeBaseRedisRepository) Add(stock entity.StockAdd) bool {
 	ctx := context.Background()
 	key := fmt.Sprintf("%s:%s", stock.StockName, stock.Type)
 

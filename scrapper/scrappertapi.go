@@ -1,9 +1,12 @@
 package scrapper
 
 import (
-	"BotStocksScrapper/list"
 	"errors"
+	"time"
 
+	"BotStocksScrapper/list"
+	repo "BotStocksScrapper/repository/changeBase"
+	chb "BotStocksScrapper/repository/changeBase/impl"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
 
 	dr "BotStocksScrapper/driver"
@@ -17,15 +20,21 @@ type ScrapperTAPI struct {
 	StockChannel  chan entity.StockInfo
 	stopScrapping chan bool
 	logger        entity.Logger
+	redis         repo.CBRepository
 }
 
+// Инициализирует и создает сущность скраппера
+// Инициализирует вложенные сущности: драйвер, БД редис
 func InitScrapper(config entity.Config) (Scrapper, error) {
+	rClient := chb.NewChangeBaseClient(config.RedisCfg.ChangeBase)
+	r := chb.NewChangeBaseRedisRepository(rClient)
 	s := ScrapperTAPI{
 		StockChannel:  make(chan entity.StockInfo, 100),
 		stopScrapping: make(chan bool),
 		config:        config,
 		trackedStocks: list.GetStocksInfoList(),
 		logger:        config.Logger,
+		redis:         r,
 	}
 
 	var err error
@@ -70,6 +79,9 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				return
 
 			case trade := <-tradeStream.Channel:
+				if s.skipTime() {
+					continue
+				}
 				var currentStock entity.Stock
 				for _, stock := range stocks {
 					if stock.FIGI == trade.Figi {
@@ -114,27 +126,34 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 						s.logger.Info("Аномалия успешно обработана")
 					}
 
-					// TODO
-					//  Получаем из бд все сделки к текущему моменту
-					//  Дозаполняем StockInfo
-					//   Дозаполняем поля
-					//    PerDaySalesVolume  float64
-					//	  PerDaySalesPercent float64
-					//	  PerDayBuysVolume   float64
-					//	  PerDayBuysPercent  float64
-					// PerDayBuysVolume сумма всех лотов сделок на покупку
-					// allStocks = db.GetAllStocksInfo(stockInfo.String()) -> []StockInfo
-					// for _, stock := range allStocks
-					//		if stock.StockMove == entity.Buy {
-					//			stockInfo.PerDayBuysVolume += stock.LotsCount
-					//		}
-					//  stockInfo.PerDaySalesVolume = stockInfo.PerDayVolume - stockInfo.PerDayBuysVolume
-					//  stockInfo.PerDaySalesPercent / stockInfo.PerDaySalesPercent - это просто процентное соотношение от общей суммы (stockInfo.PerDayVolume)
-					//
+					stockInfo.PerDaySalesVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Sale.String()))
+					if stockInfo.PerDaySalesVolume == 0 {
+						s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
+					}
+					stockInfo.PerDayBuysVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Buy.String()))
+					if stockInfo.PerDayBuysVolume == 0 {
+						s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
+					}
+
+					stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume
+					stockInfo.PerDaySalesPercent = (stockInfo.PerDayVolume / float64(100)) * stockInfo.PerDaySalesVolume
+					stockInfo.PerDayBuysPercent = float64(100) - stockInfo.PerDaySalesPercent
+
+					checkCalc := (stockInfo.PerDayVolume / float64(100)) * stockInfo.PerDayBuysVolume
+					if stockInfo.PerDaySalesPercent+checkCalc > float64(100) {
+						s.logger.Errorf("Ошибка в вычислении объема покупок/продаж за день")
+					}
 				}
-				// TODO Добавляем в бд информацию о сделке
 
 				s.StockChannel <- stockInfo
+				ok := s.redis.Add(entity.StockAdd{
+					StockName: stockInfo.Stock.UID,
+					Type:      stockInfo.StockMove.String(),
+					NumPrice:  int64(stockInfo.Volume),
+				})
+				if !ok {
+					s.logger.Errorf("Не удалось добавить в редис запись о сделке")
+				}
 			}
 		}
 	}()
@@ -146,4 +165,29 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 func (s *ScrapperTAPI) StopScrape() {
 	s.logger.Info("Скраппером получен сигнал на остановку")
 	s.stopScrapping <- true
+}
+
+func (s ScrapperTAPI) skipTime() bool {
+	today := time.Now()
+
+	location, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		s.logger.Errorf("Ошибка установки локации: %s", err.Error())
+		return false
+	}
+
+	today = today.In(location)
+
+	if today.Weekday() == time.Saturday || today.Weekday() == time.Sunday {
+		return true
+	} else {
+		startTime := time.Date(today.Year(), today.Month(), today.Day(), 9, 50, 0, 0, location)
+		endTime := time.Date(today.Year(), today.Month(), today.Day(), 18, 50, 0, 0, location)
+
+		if today.Before(startTime) || today.After(endTime) {
+			return true
+		}
+		return false
+	}
+
 }

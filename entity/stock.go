@@ -2,6 +2,7 @@ package entity
 
 import (
 	"fmt"
+
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
 	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
 )
@@ -12,6 +13,10 @@ const (
 	Sale StockMoveType = "Sale"
 	Buy  StockMoveType = "Buy"
 )
+
+func (s StockMoveType) String() string {
+	return string(s)
+}
 
 type MarketType string
 
@@ -66,7 +71,7 @@ type StockInfo struct {
 	LotsCount          int64
 	StockMove          StockMoveType
 	IsAnomaly          bool
-	PerDayVolume       int64
+	PerDayVolume       float64
 	PerDayPriceChange  float64
 	PerDaySalesVolume  float64
 	PerDaySalesPercent float64

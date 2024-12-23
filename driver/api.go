@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"BotStocksScrapper/list"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"BotStocksScrapper/list"
 
 	"BotStocksScrapper/entity"
 	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
@@ -181,12 +182,6 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 		d.logger.Info("Рабочий день. Процент изменения цены вычисляется по формуле рабочего дня")
 		stock.PerDayPriceChange = math.Round(((stock.Stock.Price-openPrice)/openPrice)*10000) / 100
 	}
-
-	var i int
-	for i, candle = range response.GetCandles() {
-		stock.PerDayVolume += candle.Volume
-	}
-	d.logger.Infof("Обработано %d свечей для акции %s:%s", i, stock.Stock.Name, stock.Stock.Ticker)
 
 	return nil
 }
