@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"BotStocksScrapper/entity"
+	"BotStocksScrapper/internal/entity"
 	"gopkg.in/yaml.v3"
 )
 
