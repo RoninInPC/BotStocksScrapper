@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	"BotStocksScrapper/app"
 )
 
@@ -12,14 +10,5 @@ func main() {
 		panic(err)
 	}
 
-	err = superGigaUltimateBot.Work()
-	if err != nil {
-		panic(err)
-	}
-
-	time.Sleep(10 * time.Second)
-	err = superGigaUltimateBot.Stop()
-	if err != nil {
-		panic(err)
-	}
+	superGigaUltimateBot.Work()
 }

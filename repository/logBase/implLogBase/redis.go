@@ -1,7 +1,7 @@
 package implLogBase
 
 import (
-	"BotStocksScrapper/app/entity"
+	"BotStocksScrapper/entity"
 	"BotStocksScrapper/hash"
 	"BotStocksScrapper/repository/logBase"
 	"context"

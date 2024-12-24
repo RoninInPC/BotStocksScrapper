@@ -12,3 +12,7 @@ func MD5(str string) string {
 	hash := fmt.Sprintf("%x", md5.Sum(data))
 	return hash
 }
+
+func Nothing(str string) string {
+	return str
+}

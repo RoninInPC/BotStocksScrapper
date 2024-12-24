@@ -26,7 +26,7 @@ type ScrapperTAPI struct {
 // Инициализирует и создает сущность скраппера
 // Инициализирует вложенные сущности: драйвер, БД редис
 func InitScrapper(config entity.Config) (Scrapper, error) {
-	rClient := chb.NewChangeBaseClient(config.RedisCfg.ChangeBase)
+	rClient := chb.NewChangeBaseClient(config.RedisChange)
 	r := chb.NewChangeBaseRedisRepository(rClient)
 	s := ScrapperTAPI{
 		StockChannel:  make(chan entity.StockInfo, 100),

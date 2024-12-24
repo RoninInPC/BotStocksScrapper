@@ -8,14 +8,10 @@ import (
 type Config struct {
 	TinkoffApiConfig investgo.Config `yaml:"tinkoff-parameters"`
 	TgToken          string          `yaml:"tg-token"`
-	RedisCfg         RedisConfig     `yaml:"redis"`
+	ChatID           int64           `yaml:"chat-id"`
+	RedisChange      RedisDBConfig   `yaml:"redis-change"`
+	RedisLog         RedisDBConfig   `yaml:"redis-log"`
 	Logger           Logger
-}
-
-// Структура конфига для БД Redis
-type RedisConfig struct {
-	LogBase    RedisDBConfig `yaml:"logBase"`
-	ChangeBase RedisDBConfig `yaml:"changeBase"`
 }
 
 type RedisDBConfig struct {

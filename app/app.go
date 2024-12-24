@@ -1,6 +1,10 @@
 package app
 
 import (
+	"BotStocksScrapper/hash"
+	chb "BotStocksScrapper/repository/changeBase/impl"
+	"BotStocksScrapper/repository/logBase/implLogBase"
+	"BotStocksScrapper/usecase"
 	"io"
 	"os"
 
@@ -47,27 +51,26 @@ func NewApp() (*App, error) {
 	app.TgService.TelegramBot = bot
 
 	// Инициализируем скраппер
-	// TODO необходимо передать chatID
-	app.ScrapperService, err = scrapper.NewScrapperService(app.Config, app.TgService.TelegramBot.BotApi, 0)
+	app.ScrapperService, err = scrapper.NewScrapperService(app.Config, app.TgService.TelegramBot.BotApi, app.Config.ChatID)
 	if err != nil {
 		return nil, err
 	}
-
 	// Инициализируем крон
-	app.CronService = cron.Service{}
-	// TODO возможно необходимо еще заполнить таски??
+	cleaner := usecase.NewDatabaseCleaner(
+		implLogBase.NewRedisRepository(
+			implLogBase.NewRedisClient(app.Config.RedisLog), hash.Nothing),
+		chb.NewChangeBaseRedisRepository(chb.NewChangeBaseClient(app.Config.RedisChange)))
 
+	app.CronService = cron.Service{[]cron.Task{{
+		Schedule: "0 3 * * *", // Каждый день в 3:00 утра
+		Action:   cleaner.Clean},
+	}}
 	return app, nil
 }
 
 // Запускает скраппер-бота
-func (a *App) Work() error {
-	// TODO implement this method
-	return nil
-}
-
-// Останавливает все сервисы и бота скраппера
-func (a *App) Stop() error {
-	// TODO implement this method
-	return nil
+func (a *App) Work() {
+	go a.ScrapperService.Work()
+	go a.CronService.Work()
+	a.TgService.Work()
 }

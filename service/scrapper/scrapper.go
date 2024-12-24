@@ -1,6 +1,9 @@
 package scrapper
 
 import (
+	"BotStocksScrapper/hash"
+	"BotStocksScrapper/repository/logBase"
+	"BotStocksScrapper/repository/logBase/implLogBase"
 	"BotStocksScrapper/sender"
 	"BotStocksScrapper/sender/telegram"
 	"time"
@@ -15,8 +18,7 @@ type ScrapperService struct {
 	stopChan      chan bool
 	sender        sender.Sender[entity.StockInfo]
 	logger        entity.Logger
-	db            any
-	// TODO добавить поле сущность бд
+	baseLog       logBase.LogBase
 }
 
 func NewScrapperService(cfg entity.Config, tgClient *tgbotapi.BotAPI, chatID int64) (ScrapperService, error) {
@@ -30,16 +32,16 @@ func NewScrapperService(cfg entity.Config, tgClient *tgbotapi.BotAPI, chatID int
 		stopChan:      make(chan bool),
 		sender:        telegram.NewSender(tgClient, chatID),
 		logger:        cfg.Logger,
-		db:            nil,
+		baseLog:       implLogBase.NewRedisRepository(implLogBase.NewRedisClient(cfg.RedisLog), hash.Nothing),
 	}, nil
 }
 
 // Блокирующая функция запускающая скраппер
-func (s *ScrapperService) Scrap() error {
+func (s *ScrapperService) Work() {
 	stockChannel, err := s.stockScrapper.Scrape()
 	if err != nil {
 		s.logger.Errorf("Не удалось запустить скраппер: %s", err.Error())
-		return err
+		return
 	}
 
 	for {
@@ -47,14 +49,17 @@ func (s *ScrapperService) Scrap() error {
 		case <-s.stopChan:
 			s.stockScrapper.StopScrape()
 			s.logger.Info("Остановлен сервис скраппера")
-			return nil
+			return
 
 		case stockInfo, ok := <-stockChannel:
 			if !ok {
 				s.logger.Warn("Канал скраппера закрыт")
-				return nil
+				return
 			}
 			if stockInfo.IsAnomaly {
+
+				s.baseLog.Add(stockInfo.String())
+
 				err = s.sender.Send(stockInfo)
 				if err != nil {
 					s.logger.Errorf("Ошибка отправки сообщения в канал: %s", err.Error())
