@@ -11,8 +11,8 @@ chat-id: -1002384110659
 redis-log:
   address: localhost:6379
   password: mypass
-  db_number: 4
+  db: 4
 redis-change:
   address: localhost:6379
   password: mypass
-  db_number: 5
+  db: 5
