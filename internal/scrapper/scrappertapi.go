@@ -109,7 +109,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				stockInfo.Volume = totalVolume
 				stockInfo.LotsCount = trade.Quantity
 
-				s.logger.Infof("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+				s.logger.Debugf("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
 					stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
 
 				if totalVolume >= currentStock.AnomalySize {
@@ -135,14 +135,11 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 						s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
 					}
 
-					stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume
-					stockInfo.PerDaySalesPercent = (stockInfo.PerDayVolume / float64(100)) * stockInfo.PerDaySalesVolume
+					stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume + stockInfo.Volume
+					stockInfo.PerDaySalesPercent = (stockInfo.PerDaySalesVolume / stockInfo.PerDayVolume) * float64(100)
 					stockInfo.PerDayBuysPercent = float64(100) - stockInfo.PerDaySalesPercent
 
-					checkCalc := (stockInfo.PerDayVolume / float64(100)) * stockInfo.PerDayBuysVolume
-					if stockInfo.PerDaySalesPercent+checkCalc > float64(100) {
-						s.logger.Errorf("Ошибка в вычислении объема покупок/продаж за день")
-					}
+					stockInfo.VolumeChange = ((float64(100) / (stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume)) * stockInfo.PerDayVolume) - float64(100)
 				}
 
 				s.StockChannel <- stockInfo
@@ -168,6 +165,7 @@ func (s *ScrapperTAPI) StopScrape() {
 }
 
 func (s ScrapperTAPI) skipTime() bool {
+	return false
 	today := time.Now()
 
 	location, err := time.LoadLocation("Europe/Moscow")

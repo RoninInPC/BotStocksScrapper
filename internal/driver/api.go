@@ -137,7 +137,9 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 
 	var exchStartTime, exchEndTime time.Time
 	for _, day := range exch.GetDays() {
-		if day.Date.AsTime().Year() == time.Now().Year() && day.Date.AsTime().YearDay() == time.Now().YearDay() {
+		msk, _ := time.LoadLocation("Europe/Moscow")
+		now := time.Now().In(msk)
+		if day.Date.AsTime().Year() == now.Year() && day.Date.AsTime().YearDay() == now.YearDay() {
 			if !day.IsTradingDay {
 				d.logger.Warnf("Биржа %s закрыта. Данные не заполнены", stock.Stock.Exchange)
 				return errors.New("Биржа закрыта. Невозможно получить данные")
@@ -160,7 +162,7 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 	}
 
 	candle := response.GetCandles()[0]
-	stock.Volume = float64(candle.Volume)
+	//stock.Volume = float64(candle.Volume)
 	openPrice := float64(candle.Open.Units) + float64(candle.Open.Nano)/1e9
 
 	// Получаем последнюю сделку по инструменту
