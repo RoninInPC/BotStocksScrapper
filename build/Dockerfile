@@ -1,4 +1,4 @@
-FROM scratch
+FROM ubuntu
 
 COPY cacert.pem /etc/ssl/certs/
 
