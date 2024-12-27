@@ -2,7 +2,7 @@ FROM scratch
 
 COPY cacert.pem /etc/ssl/certs/
 
-COPY config.ini /config/
-COPY main /
+COPY ../config/config.yaml /config/
+COPY ../cmd/main /
 
 CMD ["/main"]
