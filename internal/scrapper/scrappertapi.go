@@ -165,7 +165,6 @@ func (s *ScrapperTAPI) StopScrape() {
 }
 
 func (s ScrapperTAPI) skipTime() bool {
-	return false
 	today := time.Now()
 
 	location, err := time.LoadLocation("Europe/Moscow")
