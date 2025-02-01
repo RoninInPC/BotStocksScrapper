@@ -1,8 +1,12 @@
-FROM scratch
+FROM ubuntu
 
 COPY cacert.pem /etc/ssl/certs/
 
-COPY config.ini /config/
+RUN apt-get update && apt-get install -y tzdata
+
+ENV TZ="Europe/Moscow"
+
+COPY config.yaml /config/
 COPY main /
 
 CMD ["/main"]

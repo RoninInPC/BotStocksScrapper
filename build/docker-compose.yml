@@ -1,9 +1,8 @@
 version: '3.8'
 services:
-  client-backend:
-    image: client_stock:0.0.1
+  client-backend-2:
+    image: client:0.0.1
     build:
       context: .
       dockerfile: Dockerfile
-    user: root
     network_mode: "host"

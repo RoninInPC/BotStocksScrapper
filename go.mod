@@ -1,6 +1,6 @@
 module BotStocksScrapper
 
-go 1.23.0
+go 1.22.3
 
 require (
 	github.com/and3rson/telemux/v2 v2.0.2

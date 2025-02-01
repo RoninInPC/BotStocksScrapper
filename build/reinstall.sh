@@ -1,1 +1,1 @@
-cd /root/george/BotStocksScrapper/ && docker-compose down && docker-compose up -d
+cd /root/george/BotStocksScrapper/build && docker-compose down && docker-compose up -d
