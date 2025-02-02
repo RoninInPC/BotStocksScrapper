@@ -104,3 +104,15 @@ type StockAdd struct {
 	Type      string // SALE или BUY
 	NumPrice  int64
 }
+
+type CandleStockInfo struct {
+	Stock       Stock
+	Volume      float64
+	TradesCount int64
+	SalesCount  int64
+	BuysCount   int64
+
+	LotsCount int64
+	StockMove StockMoveType
+	IsAnomaly bool
+}

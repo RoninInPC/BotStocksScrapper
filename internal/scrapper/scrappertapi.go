@@ -21,15 +21,20 @@ type ScrapperTAPI struct {
 	stopScrapping chan bool
 	logger        entity.Logger
 	redis         repo.CBRepository
+	candleMod     bool
 }
 
 // Инициализирует и создает сущность скраппера
 // Инициализирует вложенные сущности: драйвер, БД редис
 func InitScrapper(config entity.Config) (Scrapper, error) {
 	rClient := chb.NewChangeBaseClient(config.RedisChange)
+	if rClient == nil {
+		config.Logger.Panicf("Не удалось создать клиент REDIS!\n")
+	}
+
 	r := chb.NewChangeBaseRedisRepository(rClient)
 	s := ScrapperTAPI{
-		StockChannel:  make(chan entity.StockInfo, 100),
+		StockChannel:  make(chan entity.StockInfo, 1000000),
 		stopScrapping: make(chan bool),
 		config:        config,
 		trackedStocks: list.GetStocksInfoList(),
@@ -43,6 +48,8 @@ func InitScrapper(config entity.Config) (Scrapper, error) {
 		s.logger.Errorf("не удалось создать драйвер tinkoff api: %s", err.Error())
 		return &ScrapperTAPI{}, err
 	}
+
+	s.candleMod = config.CandleScrapperMode
 
 	return &s, nil
 }
@@ -68,6 +75,13 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 	}
 	s.logger.Debug("Драйвер успешно подписался на обновления обезличенных сделок")
 
+	var tradeCh <-chan *investapi.Trade
+	if s.candleMod {
+		tradeCh = s.driver.GetTradeByCandlesCh(stocks)
+	} else {
+		tradeCh = nil
+	}
+
 	go func() {
 		for {
 			select {
@@ -82,80 +96,97 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				if s.skipTime() {
 					continue
 				}
-				var currentStock entity.Stock
-				for _, stock := range stocks {
-					if stock.FIGI == trade.Figi {
-						currentStock = stock
-					}
-				}
-				stockInfo := entity.StockInfo{}
 
-				stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
-				totalVolume := stockInfo.Stock.Price * float64(trade.Quantity) * float64(currentStock.MinLotCount)
+				s.processingTrade(trade, stocks, false)
+				break
 
-				if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_BUY {
-					stockInfo.StockMove = entity.Buy
-				} else {
-					stockInfo.StockMove = entity.Sale
-				}
-				stockInfo.Stock.Ticker = currentStock.Ticker
-				stockInfo.Stock.FIGI = trade.Figi
-				stockInfo.Stock.UID = trade.GetInstrumentUid()
-				stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
-				stockInfo.Stock.Name = currentStock.Name
-				stockInfo.Stock.MinLotCount = currentStock.MinLotCount
-				stockInfo.Stock.Exchange = currentStock.Exchange
-				stockInfo.Stock.RealExchange = currentStock.RealExchange
-				stockInfo.Volume = totalVolume
-				stockInfo.LotsCount = trade.Quantity
-
-				s.logger.Debugf("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
-					stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
-
-				if totalVolume >= currentStock.AnomalySize {
-					stockInfo.IsAnomaly = true
-					s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
-						stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
-					err = s.driver.GetPerDayStatistics(&stockInfo)
-					if err != nil {
-						s.logger.Errorf("Ошибка получения доп.информации об акции: %s", err.Error())
-						s.logger.Errorf("Информация об акции: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
-							stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
-
-					} else {
-						s.logger.Info("Аномалия успешно обработана")
-					}
-
-					stockInfo.PerDaySalesVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Sale.String()))
-					if stockInfo.PerDaySalesVolume == 0 {
-						s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
-					}
-					stockInfo.PerDayBuysVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Buy.String()))
-					if stockInfo.PerDayBuysVolume == 0 {
-						s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
-					}
-
-					stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume + stockInfo.Volume
-					stockInfo.PerDaySalesPercent = (stockInfo.PerDaySalesVolume / stockInfo.PerDayVolume) * float64(100)
-					stockInfo.PerDayBuysPercent = float64(100) - stockInfo.PerDaySalesPercent
-
-					stockInfo.VolumeChange = ((float64(100) / (stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume)) * stockInfo.PerDayVolume) - float64(100)
+			case trade := <-tradeCh:
+				if !s.skipTime() {
+					continue
 				}
 
-				s.StockChannel <- stockInfo
-				ok := s.redis.Add(entity.StockAdd{
-					StockName: stockInfo.Stock.UID,
-					Type:      stockInfo.StockMove.String(),
-					NumPrice:  int64(stockInfo.Volume),
-				})
-				if !ok {
-					s.logger.Errorf("Не удалось добавить в редис запись о сделке")
-				}
+				s.processingTrade(trade, stocks, true)
+				break
 			}
 		}
 	}()
 
 	return s.StockChannel, nil
+}
+
+func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.Stock, byCandle bool) {
+	var currentStock entity.Stock
+	for _, stock := range stocks {
+		if stock.FIGI == trade.Figi {
+			currentStock = stock
+			break
+		}
+	}
+	stockInfo := entity.StockInfo{}
+
+	stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
+	totalVolume := stockInfo.Stock.Price * float64(trade.Quantity) * float64(currentStock.MinLotCount)
+
+	if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_BUY {
+		stockInfo.StockMove = entity.Buy
+	} else {
+		stockInfo.StockMove = entity.Sale
+	}
+	stockInfo.Stock.Ticker = currentStock.Ticker
+	stockInfo.Stock.FIGI = trade.Figi
+	stockInfo.Stock.UID = trade.GetInstrumentUid()
+	stockInfo.Stock.Price = float64(trade.Price.GetUnits()) + float64(trade.Price.Nano)/1e9
+	stockInfo.Stock.Name = currentStock.Name
+	stockInfo.Stock.MinLotCount = currentStock.MinLotCount
+	stockInfo.Stock.Exchange = currentStock.Exchange
+	stockInfo.Stock.RealExchange = currentStock.RealExchange
+	stockInfo.Volume = totalVolume
+	stockInfo.LotsCount = trade.Quantity
+
+	s.logger.Debugf("Получена обезличенная сделка BY_CANDLE: %t: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+		byCandle, stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
+
+	if totalVolume >= currentStock.AnomalySize {
+		stockInfo.IsAnomaly = true
+		s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+			stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
+		err := s.driver.GetPerDayStatistics(&stockInfo)
+		if err != nil {
+			s.logger.Errorf("Ошибка получения доп.информации об акции: %s", err.Error())
+			s.logger.Errorf("Информация об акции: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+				stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
+
+		} else {
+			s.logger.Info("Аномалия успешно обработана")
+		}
+
+		stockInfo.PerDaySalesVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Sale.String()))
+		if stockInfo.PerDaySalesVolume == 0 {
+			s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
+		}
+		stockInfo.PerDayBuysVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Buy.String()))
+		if stockInfo.PerDayBuysVolume == 0 {
+			s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
+		}
+
+		stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume + stockInfo.Volume
+		stockInfo.PerDaySalesPercent = (stockInfo.PerDaySalesVolume / stockInfo.PerDayVolume) * float64(100)
+		stockInfo.PerDayBuysPercent = float64(100) - stockInfo.PerDaySalesPercent
+
+		stockInfo.VolumeChange = ((float64(100) / (stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume)) * stockInfo.PerDayVolume) - float64(100)
+	}
+
+	s.StockChannel <- stockInfo
+	if !byCandle {
+		ok := s.redis.Add(entity.StockAdd{
+			StockName: stockInfo.Stock.UID,
+			Type:      stockInfo.StockMove.String(),
+			NumPrice:  int64(stockInfo.Volume),
+		})
+		if !ok {
+			s.logger.Errorf("Не удалось добавить в редис запись о сделке")
+		}
+	}
 }
 
 // Посылает сигнал для остановки скраппинга

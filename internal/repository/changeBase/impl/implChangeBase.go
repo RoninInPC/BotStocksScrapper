@@ -28,6 +28,9 @@ func (r *ChangeBaseRedisRepository) Add(stock entity.StockAdd) bool {
 	key := fmt.Sprintf("%s:%s", stock.StockName, stock.Type)
 
 	err := r.client.IncrBy(ctx, key, stock.NumPrice).Err()
+	if err != nil {
+		fmt.Printf("ОШИБКА РЕДИСКИ: %s\n", err.Error())
+	}
 	return err == nil
 }
 

@@ -24,6 +24,7 @@ type ApiDriver struct {
 	marketStreamClient *tsdk.MarketDataStreamClient
 	operationsClient   *tsdk.OperationsServiceClient
 	ctx                context.Context
+	tradeChStream      chan *investapi.Trade
 	logger             entity.Logger
 }
 
@@ -46,6 +47,8 @@ func NewApiDriver(cfg tsdk.Config, lg entity.Logger) (*ApiDriver, error) {
 	driver.marketClient = driver.client.NewMarketDataServiceClient()
 	driver.operationsClient = driver.client.NewOperationsServiceClient()
 	driver.marketStreamClient = driver.client.NewMarketDataStreamClient()
+
+	driver.tradeChStream = make(chan *investapi.Trade, 100)
 
 	return driver, nil
 }
@@ -121,37 +124,14 @@ func (d *ApiDriver) GetTradeCh(stocks []entity.Stock) (*entity.TradeStream, erro
 // Заполняет данные статистики за день и данные изменения на основе аномалии
 // Сущность entity.StockInfo должна быть предзаполнена
 func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
-
 	// Получаем расписание текущей биржи инструмента
-	rsp, err := d.instrumentsClient.TradingSchedules(stock.Stock.Exchange, time.Now(), time.Now())
+	exchShedule, err := d.GetExchTradingShedule(stock.Stock.Exchange)
 	if err != nil {
-		d.logger.Errorf("Ошибка получения расписания для биржи %s: %s", stock.Stock.Exchange, err.Error())
-		return errors.New("Ошибка получения расписания биржи.")
-	}
-
-	if rsp.Exchanges == nil {
-		d.logger.Errorf("Отсутствует расписание для биржи %s в ответе API", stock.Stock.Exchange)
-		return errors.New("Отсутствует расписание для биржи.")
-	}
-	exch := rsp.GetExchanges()[0]
-
-	var exchStartTime, exchEndTime time.Time
-	for _, day := range exch.GetDays() {
-		msk, _ := time.LoadLocation("Europe/Moscow")
-		now := time.Now().In(msk)
-		if day.Date.AsTime().Year() == now.Year() && day.Date.AsTime().YearDay() == now.YearDay() {
-			if !day.IsTradingDay {
-				d.logger.Warnf("Биржа %s закрыта. Данные не заполнены", stock.Stock.Exchange)
-				return errors.New("Биржа закрыта. Невозможно получить данные")
-			} else {
-				exchStartTime = day.StartTime.AsTime()
-				exchEndTime = day.EndTime.AsTime()
-			}
-		}
+		return err
 	}
 
 	// Получаем свечи инструмента с момента открытия торгового дня
-	response, err := d.marketClient.GetCandles(stock.Stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_30_MIN, exchStartTime, exchEndTime)
+	response, err := d.marketClient.GetCandles(stock.Stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_30_MIN, exchShedule.Start(), exchShedule.End())
 	if err != nil {
 		d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Stock.Name, stock.Stock.Ticker, err.Error())
 		return err
@@ -162,7 +142,6 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 	}
 
 	candle := response.GetCandles()[0]
-	//stock.Volume = float64(candle.Volume)
 	openPrice := float64(candle.Open.Units) + float64(candle.Open.Nano)/1e9
 
 	// Получаем последнюю сделку по инструменту
@@ -186,4 +165,90 @@ func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
 	}
 
 	return nil
+}
+
+func (d *ApiDriver) anomalyByCandles(stocks []entity.Stock) error {
+	for {
+		exchShedule, err := d.GetExchTradingShedule(stocks[0].Exchange)
+		if err != nil {
+			d.logger.Errorf("Ошибка получения расписания биржи: %s", err.Error())
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		if !exchShedule.Contains(time.Now().Add(-5 * time.Minute)) {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		for _, stock := range stocks {
+			// Получаем свечи инструмента с момента открытия торгового дня
+			startTimePoint := time.Now()
+			endTimePoint := startTimePoint.Add(1 * time.Minute)
+			response, err := d.marketClient.GetCandles(stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTimePoint, endTimePoint)
+			if err != nil {
+				d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Name, stock.Ticker, err.Error())
+				continue
+			}
+			if response.Candles == nil || len(response.Candles) == 0 {
+				d.logger.Errorf("Для инструмента %s:%s нет свечей", stock.Name, stock.Ticker)
+				continue
+			}
+
+			for _, candle := range response.GetCandles() {
+				price := float64(candle.Close.Units) + float64(candle.Close.Nano)/1e9
+
+				// Создаем сущность *investapi.Trade на основе данных свечи
+				trade := &investapi.Trade{
+					Figi:          stock.FIGI,
+					Price:         &investapi.Quotation{Units: int64(price), Nano: int32((price - float64(int64(price))) * 1e9)},
+					Quantity:      candle.Volume,                                // Количество лотов
+					Direction:     investapi.TradeDirection_TRADE_DIRECTION_BUY, // Направление неизвестно, ставим в качестве заглушки направление покупка
+					InstrumentUid: stock.UID,
+				}
+
+				// Отправляем сделку в канал
+				d.tradeChStream <- trade
+			}
+		}
+		time.Sleep(5 * time.Minute)
+	}
+}
+
+func (d *ApiDriver) GetTradeByCandlesCh(stocks []entity.Stock) <-chan *investapi.Trade {
+	go func() {
+		d.anomalyByCandles(stocks)
+	}()
+	return d.tradeChStream
+}
+
+func (d *ApiDriver) GetExchTradingShedule(exchange string) (shedule *entity.TimeRange, err error) {
+	// Получаем расписание текущей биржи инструмента
+	rsp, err := d.instrumentsClient.TradingSchedules(exchange, time.Now(), time.Now())
+	if err != nil {
+		d.logger.Errorf("Ошибка получения расписания для биржи %s: %s", exchange, err.Error())
+		return nil, errors.New("Ошибка получения расписания биржи.")
+	}
+
+	if rsp.Exchanges == nil {
+		d.logger.Errorf("Отсутствует расписание для биржи %s в ответе API", exchange)
+		return nil, errors.New("Отсутствует расписание для биржи.")
+	}
+	exch := rsp.GetExchanges()[0]
+
+	for _, day := range exch.GetDays() {
+		msk, _ := time.LoadLocation("Europe/Moscow")
+		now := time.Now().In(msk)
+		if day.Date.AsTime().Year() == now.Year() && day.Date.AsTime().YearDay() == now.YearDay() {
+			if !day.IsTradingDay {
+				d.logger.Warnf("Биржа %s закрыта. Данные не заполнены", exchange)
+				return nil, errors.New("Биржа закрыта. Невозможно получить данные")
+			} else {
+				shedule, err = entity.NewTimeRange(day.StartTime.AsTime(), day.EndTime.AsTime())
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	return
 }
