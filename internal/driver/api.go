@@ -25,10 +25,11 @@ type ApiDriver struct {
 	operationsClient   *tsdk.OperationsServiceClient
 	ctx                context.Context
 	tradeChStream      chan *investapi.Trade
+	candleDuration     int64
 	logger             entity.Logger
 }
 
-func NewApiDriver(cfg tsdk.Config, lg entity.Logger) (*ApiDriver, error) {
+func NewApiDriver(cfg tsdk.Config, lg entity.Logger, candleDuration int64) (*ApiDriver, error) {
 	driver := &ApiDriver{
 		config: cfg,
 		logger: lg,
@@ -49,6 +50,7 @@ func NewApiDriver(cfg tsdk.Config, lg entity.Logger) (*ApiDriver, error) {
 	driver.marketStreamClient = driver.client.NewMarketDataStreamClient()
 
 	driver.tradeChStream = make(chan *investapi.Trade, 100)
+	driver.candleDuration = candleDuration
 
 	return driver, nil
 }
@@ -181,9 +183,8 @@ func (d *ApiDriver) anomalyByCandles(stocks []entity.Stock) error {
 			continue
 		}
 		for _, stock := range stocks {
-			// Получаем свечи инструмента с момента открытия торгового дня
 			startTimePoint := time.Now()
-			endTimePoint := startTimePoint.Add(1 * time.Minute)
+			endTimePoint := startTimePoint.Add(time.Duration(d.candleDuration))
 			response, err := d.marketClient.GetCandles(stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTimePoint, endTimePoint)
 			if err != nil {
 				d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Name, stock.Ticker, err.Error())
@@ -206,7 +207,6 @@ func (d *ApiDriver) anomalyByCandles(stocks []entity.Stock) error {
 					InstrumentUid: stock.UID,
 				}
 
-				// Отправляем сделку в канал
 				d.tradeChStream <- trade
 			}
 		}

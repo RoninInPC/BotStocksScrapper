@@ -77,6 +77,7 @@ type StockInfo struct {
 	PerDaySalesPercent float64
 	PerDayBuysVolume   float64
 	PerDayBuysPercent  float64
+	ByCandle           bool
 }
 
 // Возвращает строку от StockInfo

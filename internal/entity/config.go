@@ -12,6 +12,7 @@ type Config struct {
 	RedisChange        RedisDBConfig   `yaml:"redis-change"`
 	RedisLog           RedisDBConfig   `yaml:"redis-log"`
 	CandleScrapperMode bool            `yaml:"candle-scrapper-mode"`
+	CandleDuration     int64           `yaml:"candle-duration-ns"`
 	Logger             Logger
 }
 

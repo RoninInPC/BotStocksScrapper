@@ -43,7 +43,7 @@ func InitScrapper(config entity.Config) (Scrapper, error) {
 	}
 
 	var err error
-	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, config.Logger)
+	s.driver, err = dr.NewApiDriver(config.TinkoffApiConfig, config.Logger, config.CandleDuration)
 	if err != nil {
 		s.logger.Errorf("не удалось создать драйвер tinkoff api: %s", err.Error())
 		return &ScrapperTAPI{}, err
@@ -101,7 +101,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				break
 
 			case trade := <-tradeCh:
-				if !s.skipTime() {
+				if s.skipTime() {
 					continue
 				}
 
@@ -143,7 +143,7 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 	stockInfo.Volume = totalVolume
 	stockInfo.LotsCount = trade.Quantity
 
-	s.logger.Debugf("Получена обезличенная сделка BY_CANDLE: %t: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+	s.logger.Debugf("Получена обезличенная сделка BY_CANDLE: %t; NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
 		byCandle, stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
 
 	if totalVolume >= currentStock.AnomalySize {
@@ -176,7 +176,6 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 		stockInfo.VolumeChange = ((float64(100) / (stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume)) * stockInfo.PerDayVolume) - float64(100)
 	}
 
-	s.StockChannel <- stockInfo
 	if !byCandle {
 		ok := s.redis.Add(entity.StockAdd{
 			StockName: stockInfo.Stock.UID,
@@ -186,7 +185,12 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 		if !ok {
 			s.logger.Errorf("Не удалось добавить в редис запись о сделке")
 		}
+		stockInfo.ByCandle = false
+	} else {
+		stockInfo.ByCandle = true
 	}
+
+	s.StockChannel <- stockInfo
 }
 
 // Посылает сигнал для остановки скраппинга

@@ -11,13 +11,20 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 	volume, rng := VolumeFormater(stock.Volume)
 	answerPreview := fmt.Sprintf("🔴$%s %.2f%% %.2f%s\n", stock.Stock.Ticker, stock.VolumeChange, volume, rng)
 	stockName := markdown.ToBold(stock.Stock.Name) + "\n"
-	answerDescr := "Аномальный объем на "
-	if stock.StockMove == entity.Sale {
-		answerDescr += fmt.Sprintf("продажу")
+
+	var answerDescr string
+	if !stock.ByCandle {
+		answerDescr = "Аномальный объем на "
+		if stock.StockMove == entity.Sale {
+			answerDescr += fmt.Sprintf("продажу")
+		} else {
+			answerDescr += fmt.Sprintf("покупку")
+		}
+		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	} else {
-		answerDescr += fmt.Sprintf("покупку")
+		answerDescr = "Аномальный объем"
+		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	}
-	answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 
 	answerBody := fmt.Sprintf("Цена: %.2f₽\n", stock.Stock.Price)
 	answerBody += fmt.Sprintf("Объем: %.1f [%d %s]\n", stock.Volume, stock.LotsCount, LotWordEnding(stock.LotsCount))
