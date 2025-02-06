@@ -7,9 +7,9 @@ tinkoff-parameters:
   DisableAllRetry: false
   MaxRetries: 3
 candle-duration-ns: 60000000000
-candle-scrapper-mode: true
+candle-scrapper-mode: false
 tg-token: 7097380480:AAEu5s1B4Yp38UF-CrB3jVhn5qvKhiIF-2A
-chat-id: -1002384110659
+chat-id: -1002465436705
 redis-log:
   address: redis:6379
   password: mypass

@@ -6,4 +6,4 @@ cd .. && cd cmd && \
 CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main . && \
 cd .. && cp cmd/main build && cp config/config.yaml build && cd build &&\
 docker build -t bot_stocks_docker . && \
-docker-compose up -d --build
+docker run --rm --name bot_stocks_docker_run -p 9099:9099 -d --network host -v /etc/project:/etc/project -v /etc/timezone:/etc/timezone -v /etc/localtime:/etc/localtime bot_stocks_docker

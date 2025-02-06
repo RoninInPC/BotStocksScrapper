@@ -1,8 +1,0 @@
-version: '3.8'
-services:
-  client-backend-2:
-    image: client:0.0.1
-    build:
-      context: .
-      dockerfile: Dockerfile
-    network_mode: "host"

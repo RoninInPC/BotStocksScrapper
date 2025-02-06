@@ -60,24 +60,26 @@ func NewApiDriver(cfg tsdk.Config, lg entity.Logger, candleDuration int64) (*Api
 func (d *ApiDriver) InitStocks(trackedStocks []list.StockScrapeInfo) ([]entity.Stock, error) {
 	stocks := []entity.Stock{}
 
+	s, _ := d.instrumentsClient.Shares(investapi.InstrumentStatus_INSTRUMENT_STATUS_ALL)
+	instruments := s.GetInstruments()
+
 	for _, stock := range trackedStocks {
-		response, err := d.instrumentsClient.ShareByFigi(stock.Figi)
-		if err != nil || response == nil {
-			d.logger.Errorf("не удалось получить ID инструмента по FIGI <%s>: %s", stock.Figi, err.Error())
-			return nil, err
+		for _, instrument := range instruments {
+			if instrument.Ticker == stock.StockTag {
+				stocks = append(stocks, entity.Stock{
+					Name:         instrument.Name,
+					Ticker:       instrument.Ticker,
+					FIGI:         instrument.Figi,
+					UID:          instrument.Uid,
+					MinLotCount:  int(instrument.Lot),
+					AnomalySize:  stock.AnomalySize,
+					RealExchange: instrument.RealExchange.String(),
+					Exchange:     instrument.Exchange,
+					Price:        0,
+				})
+			}
 		}
 
-		stocks = append(stocks, entity.Stock{
-			Name:         response.GetInstrument().Name,
-			Ticker:       response.GetInstrument().Ticker,
-			FIGI:         response.GetInstrument().Figi,
-			UID:          response.GetInstrument().Uid,
-			MinLotCount:  int(response.GetInstrument().Lot),
-			AnomalySize:  stock.AnomalySize,
-			RealExchange: response.GetInstrument().RealExchange.String(),
-			Exchange:     response.GetInstrument().Exchange,
-			Price:        0,
-		})
 	}
 
 	return stocks, nil
