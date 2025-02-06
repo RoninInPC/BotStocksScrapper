@@ -92,6 +92,7 @@ func (d *ApiDriver) GetTradeCh(stocks []entity.Stock) (*entity.TradeStream, erro
 
 	var instrumentIDs []string
 	for _, stock := range stocks {
+		d.logger.Info(stock.UID, stock.Ticker, stock.FIGI)
 		instrumentIDs = append(instrumentIDs, stock.UID)
 	}
 
