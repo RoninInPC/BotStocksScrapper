@@ -13,7 +13,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 	stockName := markdown.ToBold(stock.Stock.Name) + "\n"
 
 	var answerDescr string
-	if !stock.ByCandle {
+	if !stock.FromAnalysis {
 		answerDescr = "Аномальный объем на "
 		if stock.StockMove == entity.Sale {
 			answerDescr += fmt.Sprintf("продажу")

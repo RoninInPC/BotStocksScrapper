@@ -77,13 +77,16 @@ type StockInfo struct {
 	PerDaySalesPercent float64
 	PerDayBuysVolume   float64
 	PerDayBuysPercent  float64
-	ByCandle           bool
+	FromAnalysis       bool
 }
 
 // Возвращает строку от StockInfo
-func (s *StockInfo) String() string {
+func (s *StockInfo) StringFull() string {
 	return fmt.Sprintf("Name:%s;Ticker:%s;FIGI:%s;UID:%s;Price:%d;Volume:%d;LotsCount:%d;StockMove:%s",
 		s.Stock.Name, s.Stock.Ticker, s.Stock.FIGI, s.Stock.UID, s.Stock.Price, s.Volume, s.LotsCount, s.StockMove)
+}
+func (s *StockInfo) StringShort() string {
+	return fmt.Sprintf("Price: %d; Volume: %d; LotsCount: %d;", s.Stock.Price, s.Volume, s.LotsCount)
 }
 
 // Отслеживаемые акции

@@ -58,7 +58,7 @@ func (s *ScrapperService) Work() {
 			}
 			if stockInfo.IsAnomaly {
 
-				s.baseLog.Add(stockInfo.String())
+				s.baseLog.Add(stockInfo.StringFull())
 
 				err = s.sender.Send(stockInfo)
 				if err != nil {

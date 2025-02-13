@@ -1,6 +1,8 @@
 package scrapper
 
 import (
+	"BotStocksScrapper/internal/analysis"
+	"BotStocksScrapper/internal/analysis/simple"
 	"errors"
 	"time"
 
@@ -21,6 +23,7 @@ type ScrapperTAPI struct {
 	stopScrapping chan bool
 	logger        entity.Logger
 	redis         repo.CBRepository
+	analysis      analysis.Analysis
 	candleMod     bool
 }
 
@@ -40,6 +43,7 @@ func InitScrapper(config entity.Config) (Scrapper, error) {
 		trackedStocks: list.GetStocksInfoList(),
 		logger:        config.Logger,
 		redis:         r,
+		analysis:      simple.Init(),
 	}
 
 	var err error
@@ -75,13 +79,6 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 	}
 	s.logger.Debug("Драйвер успешно подписался на обновления обезличенных сделок")
 
-	var tradeCh <-chan *investapi.Trade
-	if s.candleMod {
-		tradeCh = s.driver.GetTradeByCandlesCh(stocks)
-	} else {
-		tradeCh = nil
-	}
-
 	go func() {
 		for {
 			select {
@@ -96,16 +93,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				if s.skipTime() {
 					continue
 				}
-
 				s.processingTrade(trade, stocks, false)
-				break
-
-			case trade := <-tradeCh:
-				if s.skipTime() {
-					continue
-				}
-
-				s.processingTrade(trade, stocks, true)
 				break
 			}
 		}
@@ -185,9 +173,9 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 		if !ok {
 			s.logger.Errorf("Не удалось добавить в редис запись о сделке")
 		}
-		stockInfo.ByCandle = false
+		stockInfo.FromAnalysis = false
 	} else {
-		stockInfo.ByCandle = true
+		stockInfo.FromAnalysis = true
 	}
 
 	s.StockChannel <- stockInfo
