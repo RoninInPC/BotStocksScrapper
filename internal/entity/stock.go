@@ -12,6 +12,7 @@ type StockMoveType string
 const (
 	Sale StockMoveType = "Sale"
 	Buy  StockMoveType = "Buy"
+	None StockMoveType = "None"
 )
 
 func (s StockMoveType) String() string {
@@ -77,7 +78,7 @@ type StockInfo struct {
 	PerDaySalesPercent float64
 	PerDayBuysVolume   float64
 	PerDayBuysPercent  float64
-	FromAnalysis       bool
+	InfoByFiveMin      StocksByMoveType
 }
 
 // Возвращает строку от StockInfo

@@ -3,6 +3,7 @@ package scrapper
 import (
 	"BotStocksScrapper/internal/analysis"
 	"BotStocksScrapper/internal/analysis/simple"
+	"BotStocksScrapper/internal/mappers"
 	"errors"
 	"time"
 
@@ -78,7 +79,22 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 		return nil, errors.New("не удалось запустить прослушивание стрима драйвера")
 	}
 	s.logger.Debug("Драйвер успешно подписался на обновления обезличенных сделок")
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			for _, stock := range stocks {
+				info, isAnomaly := s.analysis.GetAnomaly(stock)
 
+				if isAnomaly {
+					infoStock, b := s.IsAnomaly(mappers.StockByMovementToStock(stock, info), stock, true)
+					if b {
+						s.StockChannel <- infoStock
+					}
+				}
+				s.analysis.RemoveTicker(stock.Ticker)
+			}
+		}
+	}()
 	go func() {
 		for {
 			select {
@@ -93,7 +109,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				if s.skipTime() {
 					continue
 				}
-				s.processingTrade(trade, stocks, false)
+				s.processingTrade(trade, stocks)
 				break
 			}
 		}
@@ -102,7 +118,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 	return s.StockChannel, nil
 }
 
-func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.Stock, byCandle bool) {
+func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.Stock) {
 	var currentStock entity.Stock
 	for _, stock := range stocks {
 		if stock.FIGI == trade.Figi {
@@ -118,7 +134,11 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 	if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_BUY {
 		stockInfo.StockMove = entity.Buy
 	} else {
-		stockInfo.StockMove = entity.Sale
+		if trade.Direction == investapi.TradeDirection_TRADE_DIRECTION_SELL {
+			stockInfo.StockMove = entity.Sale
+		} else {
+			stockInfo.StockMove = entity.None
+		}
 	}
 	stockInfo.Stock.Ticker = currentStock.Ticker
 	stockInfo.Stock.FIGI = trade.Figi
@@ -131,41 +151,21 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 	stockInfo.Volume = totalVolume
 	stockInfo.LotsCount = trade.Quantity
 
-	s.logger.Debugf("Получена обезличенная сделка BY_CANDLE: %t; NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
-		byCandle, stockInfo.Stock.Name, stockInfo.Stock.Ticker, stockInfo.Stock.Price, stockInfo.LotsCount, stockInfo.StockMove)
+	s.logger.Debugf("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+		stockInfo.Stock.Name,
+		stockInfo.Stock.Ticker,
+		stockInfo.Stock.Price,
+		stockInfo.LotsCount,
+		stockInfo.StockMove)
 
-	if totalVolume >= currentStock.AnomalySize {
-		stockInfo.IsAnomaly = true
-		s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
-			stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
-		err := s.driver.GetPerDayStatistics(&stockInfo)
-		if err != nil {
-			s.logger.Errorf("Ошибка получения доп.информации об акции: %s", err.Error())
-			s.logger.Errorf("Информация об акции: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
-				stockInfo.Stock.Name, stockInfo.Stock.Price, stockInfo.Volume, stockInfo.LotsCount, stockInfo.StockMove)
+	stockInfo, _ = s.IsAnomaly(stockInfo, currentStock, false)
 
-		} else {
-			s.logger.Info("Аномалия успешно обработана")
+	if stockInfo.StockMove != entity.None {
+		ok := s.analysis.Add(stockInfo)
+		if !ok {
+			s.logger.Errorf("Не удалось добавить в систему анализа запись о сделке")
 		}
-
-		stockInfo.PerDaySalesVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Sale.String()))
-		if stockInfo.PerDaySalesVolume == 0 {
-			s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
-		}
-		stockInfo.PerDayBuysVolume = float64(s.redis.Get(stockInfo.Stock.UID, entity.Buy.String()))
-		if stockInfo.PerDayBuysVolume == 0 {
-			s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
-		}
-
-		stockInfo.PerDayVolume = stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume + stockInfo.Volume
-		stockInfo.PerDaySalesPercent = (stockInfo.PerDaySalesVolume / stockInfo.PerDayVolume) * float64(100)
-		stockInfo.PerDayBuysPercent = float64(100) - stockInfo.PerDaySalesPercent
-
-		stockInfo.VolumeChange = ((float64(100) / (stockInfo.PerDaySalesVolume + stockInfo.PerDayBuysVolume)) * stockInfo.PerDayVolume) - float64(100)
-	}
-
-	if !byCandle {
-		ok := s.redis.Add(entity.StockAdd{
+		ok = s.redis.Add(entity.StockAdd{
 			StockName: stockInfo.Stock.UID,
 			Type:      stockInfo.StockMove.String(),
 			NumPrice:  int64(stockInfo.Volume),
@@ -173,12 +173,47 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 		if !ok {
 			s.logger.Errorf("Не удалось добавить в редис запись о сделке")
 		}
-		stockInfo.FromAnalysis = false
-	} else {
-		stockInfo.FromAnalysis = true
 	}
 
 	s.StockChannel <- stockInfo
+}
+
+func (s *ScrapperTAPI) IsAnomaly(info entity.StockInfo, stock entity.Stock, doubleVolume bool) (entity.StockInfo, bool) {
+	if info.Volume >= stock.AnomalySize {
+		info.IsAnomaly = true
+		s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+			info.Stock.Name, info.Stock.Price, info.Volume, info.LotsCount, info.StockMove)
+		err := s.driver.GetPerDayStatistics(&info)
+		if err != nil {
+			s.logger.Errorf("Ошибка получения доп.информации об акции: %s", err.Error())
+			s.logger.Errorf("Информация об акции: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
+				info.Stock.Name, info.Stock.Price, info.Volume, info.LotsCount, info.StockMove)
+
+		} else {
+			s.logger.Info("Аномалия успешно обработана")
+		}
+
+		info.PerDaySalesVolume = float64(s.redis.Get(info.Stock.UID, entity.Sale.String()))
+		if info.PerDaySalesVolume == 0 {
+			s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
+		}
+		info.PerDayBuysVolume = float64(s.redis.Get(info.Stock.UID, entity.Buy.String()))
+		if info.PerDayBuysVolume == 0 {
+			s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
+		}
+		if doubleVolume {
+			info.PerDayVolume = info.PerDaySalesVolume + info.PerDayBuysVolume
+		} else {
+			info.PerDayVolume = info.PerDaySalesVolume + info.PerDayBuysVolume + info.Volume
+		}
+
+		info.PerDaySalesPercent = (info.PerDaySalesVolume / info.PerDayVolume) * float64(100)
+		info.PerDayBuysPercent = float64(100) - info.PerDaySalesPercent
+
+		info.VolumeChange = ((float64(100) / (info.PerDaySalesVolume + info.PerDayBuysVolume)) * info.PerDayVolume) - float64(100)
+		return info, true
+	}
+	return info, false
 }
 
 // Посылает сигнал для остановки скраппинга

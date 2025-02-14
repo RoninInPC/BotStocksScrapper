@@ -25,6 +25,7 @@ func (s TelegramSender) Send(stock entity.StockInfo) error {
 	}
 	chatMessage := tgbotapi.NewMessage(s.chatID, msg)
 	chatMessage.ParseMode = tgbotapi.ModeMarkdown
+	
 	_, err := s.tgClient.Send(chatMessage)
 
 	return err

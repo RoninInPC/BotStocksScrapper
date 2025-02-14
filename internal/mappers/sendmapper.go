@@ -9,15 +9,17 @@ import (
 
 func StockInfoToStringMsg(stock entity.StockInfo) string {
 	volume, rng := VolumeFormater(stock.Volume)
-	answerPreview := fmt.Sprintf("🔴$%s %.2f%% %.2f%s\n", stock.Stock.Ticker, stock.VolumeChange, volume, rng)
+	answerPreview := fmt.Sprintf("$%s %.2f%% %.2f%s\n", stock.Stock.Ticker, stock.VolumeChange, volume, rng)
 	stockName := markdown.ToBold(stock.Stock.Name) + "\n"
 
 	var answerDescr string
-	if !stock.FromAnalysis {
-		answerDescr = "Аномальный объем на "
+	if stock.StockMove != entity.None {
+		answerDescr = "Инсайдерская сделка на "
 		if stock.StockMove == entity.Sale {
+			answerPreview = "🔴" + answerPreview
 			answerDescr += fmt.Sprintf("продажу")
 		} else {
+			answerPreview = "🟢" + answerPreview
 			answerDescr += fmt.Sprintf("покупку")
 		}
 		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
