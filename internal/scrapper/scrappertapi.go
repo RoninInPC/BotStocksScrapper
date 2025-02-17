@@ -166,7 +166,7 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 			s.logger.Errorf("Не удалось добавить в систему анализа запись о сделке")
 		}
 		ok = s.redis.Add(entity.StockAdd{
-			StockName: stockInfo.Stock.UID,
+			StockName: stockInfo.Stock.Ticker,
 			Type:      stockInfo.StockMove.String(),
 			NumPrice:  int64(stockInfo.Volume),
 		})
@@ -193,24 +193,27 @@ func (s *ScrapperTAPI) IsAnomaly(info entity.StockInfo, stock entity.Stock, doub
 			s.logger.Info("Аномалия успешно обработана")
 		}
 
-		info.PerDaySalesVolume = float64(s.redis.Get(info.Stock.UID, entity.Sale.String()))
+		info.PerDaySalesVolume = float64(s.redis.Get(info.Stock.Ticker, entity.Sale.String()))
 		if info.PerDaySalesVolume == 0 {
 			s.logger.Warn("Аномальное значение суммы продаж: 0 !!!")
 		}
-		info.PerDayBuysVolume = float64(s.redis.Get(info.Stock.UID, entity.Buy.String()))
+		info.PerDayBuysVolume = float64(s.redis.Get(info.Stock.Ticker, entity.Buy.String()))
 		if info.PerDayBuysVolume == 0 {
 			s.logger.Warn("Аномальное значение суммы покупок: 0 !!!")
 		}
 		if doubleVolume {
 			info.PerDayVolume = info.PerDaySalesVolume + info.PerDayBuysVolume
+			info.VolumeChange = (float64(100) * (info.Volume)) / info.PerDayVolume
+
 		} else {
 			info.PerDayVolume = info.PerDaySalesVolume + info.PerDayBuysVolume + info.Volume
+			info.VolumeChange = ((float64(100) / (info.PerDaySalesVolume + info.PerDayBuysVolume)) * info.PerDayVolume) - float64(100)
+
 		}
 
 		info.PerDaySalesPercent = (info.PerDaySalesVolume / info.PerDayVolume) * float64(100)
 		info.PerDayBuysPercent = float64(100) - info.PerDaySalesPercent
 
-		info.VolumeChange = ((float64(100) / (info.PerDaySalesVolume + info.PerDayBuysVolume)) * info.PerDayVolume) - float64(100)
 		return info, true
 	}
 	return info, false

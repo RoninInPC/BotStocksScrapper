@@ -25,9 +25,7 @@ func NewChangeBaseRedisRepository(client *redis.Client) *ChangeBaseRedisReposito
 
 func (r *ChangeBaseRedisRepository) Add(stock entity.StockAdd) bool {
 	ctx := context.Background()
-	key := fmt.Sprintf("%s:%s", stock.StockName, stock.Type)
-
-	err := r.client.IncrBy(ctx, key, stock.NumPrice).Err()
+	err := r.client.HIncrBy(ctx, stock.StockName, stock.Type, stock.NumPrice).Err()
 	if err != nil {
 		fmt.Printf("ОШИБКА РЕДИСКИ: %s\n", err.Error())
 	}
@@ -36,9 +34,7 @@ func (r *ChangeBaseRedisRepository) Add(stock entity.StockAdd) bool {
 
 func (r *ChangeBaseRedisRepository) Get(stockName, operationType string) int64 {
 	ctx := context.Background()
-	key := fmt.Sprintf("%s:%s", stockName, operationType)
-
-	value, err := r.client.Get(ctx, key).Int64()
+	value, err := r.client.HGet(ctx, stockName, operationType).Int64()
 	if err != nil {
 		return 0
 	}
@@ -46,7 +42,6 @@ func (r *ChangeBaseRedisRepository) Get(stockName, operationType string) int64 {
 }
 
 func (r *ChangeBaseRedisRepository) Free() bool {
-
 	ctx := context.Background()
 	err := r.client.FlushDB(ctx).Err()
 	return err == nil

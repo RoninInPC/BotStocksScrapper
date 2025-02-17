@@ -17,27 +17,80 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 		answerDescr = "Инсайдерская сделка на "
 		if stock.StockMove == entity.Sale {
 			answerPreview = "🔴" + answerPreview
-			answerDescr += fmt.Sprintf("продажу")
+			answerDescr += fmt.Sprintf("продажу:")
 		} else {
 			answerPreview = "🟢" + answerPreview
-			answerDescr += fmt.Sprintf("покупку")
+			answerDescr += fmt.Sprintf("покупку:")
 		}
 		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	} else {
-		answerDescr = "Аномальный объем"
-		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
+		answerDescr = "Аномальный объем:"
+		answerDescr = fmt.Sprintf("%s\n", markdown.ToBold(answerDescr))
 	}
 
-	answerBody := fmt.Sprintf("Цена: %.2f₽\n", stock.Stock.Price)
-	answerBody += fmt.Sprintf("Объем: %.1f [%d %s]\n", stock.Volume, stock.LotsCount, LotWordEnding(stock.LotsCount))
-	answerBody += fmt.Sprintf("Изменение на объеме: %.2f%%\n\n\n", stock.VolumeChange)
+	answerBody := fmt.Sprintf("%s %.2f₽\n",
+		markdown.ToItalic("Цена:"),
+		stock.Stock.Price)
+	answerBody += fmt.Sprintf("%s %.1f [%d %s]\n",
+		markdown.ToItalic("Объем:"),
+		stock.Volume,
+		stock.LotsCount,
+		LotWordEnding(stock.LotsCount))
+	answerBody += fmt.Sprintf("%s %.2f%%\n\n",
+		markdown.ToItalic("Изменение на объеме:"),
+		stock.VolumeChange)
 
-	dayStatistic := fmt.Sprintf("%s\n", markdown.ToBold("Итого за день"))
-	dayStatistic += fmt.Sprintf("Изменение цены: %.2f%%\n", stock.PerDayPriceChange)
-	dayStatistic += fmt.Sprintf("Покупки: %.2f%%, %.4f ₽\n", stock.PerDaySalesPercent, stock.PerDaySalesVolume)
-	dayStatistic += fmt.Sprintf("Продажи: %.2f%%, %.4f ₽\n", stock.PerDayBuysPercent, stock.PerDayBuysVolume)
+	statisticFiveMin := ""
+	if stock.StockMove == entity.None {
+		slice := stock.InfoByFiveMin.ToSlice()
 
-	answer := answerPreview + stockName + answerDescr + answerBody + dayStatistic
+		statisticFiveMin += fmt.Sprintf("%s\n", markdown.ToBold("Статистика:"))
+
+		statisticFiveMin += fmt.Sprintf("%s %d\n",
+			markdown.ToItalic("Количество сделок:"), slice.Len())
+
+		avgLots := int64(slice.AvgLots())
+		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+			markdown.ToItalic("Средний объём:"),
+			slice.AvgVolume(),
+			avgLots,
+			LotWordEnding(avgLots))
+
+		medLots := slice.MedianLots()
+		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+			markdown.ToItalic("Медианный объём:"),
+			slice.MedianVolume(),
+			medLots,
+			LotWordEnding(medLots))
+
+		minLots := slice.MinLots()
+		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+			markdown.ToItalic("Минимальный объём:"),
+			slice.MinVolume(),
+			minLots,
+			LotWordEnding(minLots))
+
+		maxLots := slice.MaxLots()
+		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+			markdown.ToItalic("Максимальный объём:"),
+			slice.MaxVolume(),
+			maxLots,
+			LotWordEnding(maxLots))
+
+		bought := stock.InfoByFiveMin[entity.Buy]
+		saled := stock.InfoByFiveMin[entity.Sale]
+
+		statisticFiveMin += fmt.Sprintf("%s %.2f%%", markdown.ToItalic("Покупки:"))
+	} else {
+		answerBody += "\n"
+	}
+
+	dayStatistic := fmt.Sprintf("%s\n", markdown.ToBold("Итого за день:"))
+	dayStatistic += fmt.Sprintf("%s %.2f%%\n", markdown.ToItalic("Изменение цены:"), stock.PerDayPriceChange)
+	dayStatistic += fmt.Sprintf("%s %.2f%%, %.4f ₽\n", markdown.ToItalic("Покупки:"), stock.PerDaySalesPercent, stock.PerDaySalesVolume)
+	dayStatistic += fmt.Sprintf("%s %.2f%%, %.4f ₽\n", markdown.ToItalic("Продажи:"), stock.PerDayBuysPercent, stock.PerDayBuysVolume)
+
+	answer := answerPreview + stockName + answerDescr + answerBody + statisticFiveMin + dayStatistic
 	return answer
 }
 
