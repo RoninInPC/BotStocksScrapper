@@ -82,6 +82,9 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 	go func() {
 		for {
 			time.Sleep(5 * time.Minute)
+			if s.skipTime() {
+				continue
+			}
 			for _, stock := range stocks {
 				info, isAnomaly := s.analysis.GetAnomaly(stock)
 
