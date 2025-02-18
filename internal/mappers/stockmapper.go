@@ -16,6 +16,6 @@ func StockByMovementToStock(stock entity.Stock, moveType entity.StocksByMoveType
 	stockInfo.Volume = sliceStock.SumVolume()
 	stockInfo.LotsCount = sliceStock.SumLots()
 	stockInfo.StockMove = entity.None
-	stockInfo.InfoByFiveMin = moveType
+	stockInfo.InfoByFiveMin = moveType.Copy()
 	return stockInfo
 }

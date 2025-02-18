@@ -31,7 +31,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 	answerBody := fmt.Sprintf("%s %.2f₽\n",
 		markdown.ToItalic("Цена:"),
 		stock.Stock.Price)
-	answerBody += fmt.Sprintf("%s %.1f [%d %s]\n",
+	answerBody += fmt.Sprintf("%s %.1f \\[%d %s]\n",
 		markdown.ToItalic("Объем:"),
 		stock.Volume,
 		stock.LotsCount,
@@ -50,28 +50,28 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 			markdown.ToItalic("Количество сделок:"), slice.Len())
 
 		avgLots := int64(slice.AvgLots())
-		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+		statisticFiveMin += fmt.Sprintf("%s %.1f \\[%d %s]\n",
 			markdown.ToItalic("Средний объём:"),
 			slice.AvgVolume(),
 			avgLots,
 			LotWordEnding(avgLots))
 
 		medLots := slice.MedianLots()
-		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+		statisticFiveMin += fmt.Sprintf("%s %.1f \\[%d %s]\n",
 			markdown.ToItalic("Медианный объём:"),
 			slice.MedianVolume(),
 			medLots,
 			LotWordEnding(medLots))
 
 		minLots := slice.MinLots()
-		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+		statisticFiveMin += fmt.Sprintf("%s %.1f \\[%d %s]\n",
 			markdown.ToItalic("Минимальный объём:"),
 			slice.MinVolume(),
 			minLots,
 			LotWordEnding(minLots))
 
 		maxLots := slice.MaxLots()
-		statisticFiveMin += fmt.Sprintf("%s %.1f [%d %s]\n",
+		statisticFiveMin += fmt.Sprintf("%s %.1f \\[%d %s]\n",
 			markdown.ToItalic("Максимальный объём:"),
 			slice.MaxVolume(),
 			maxLots,
@@ -79,8 +79,17 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 
 		bought := stock.InfoByFiveMin[entity.Buy]
 		saled := stock.InfoByFiveMin[entity.Sale]
-
-		statisticFiveMin += fmt.Sprintf("%s %.2f%%", markdown.ToItalic("Покупки:"))
+		if bought.SumVolume() < saled.SumVolume() {
+			answerPreview = "🔴" + answerPreview
+		} else {
+			answerPreview = "🟢" + answerPreview
+		}
+		statisticFiveMin += fmt.Sprintf("%s %.2f%%\n",
+			markdown.ToItalic("Покупки:"),
+			bought.SumVolume()/stock.Volume*100)
+		statisticFiveMin += fmt.Sprintf("%s %.2f%%\n\n",
+			markdown.ToItalic("Продажи:"),
+			saled.SumVolume()/stock.Volume*100)
 	} else {
 		answerBody += "\n"
 	}
