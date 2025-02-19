@@ -14,7 +14,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 
 	var answerDescr string
 	if stock.StockMove != entity.None {
-		answerDescr = "Инсайдерская сделка на "
+		answerDescr = "❗️ИНСАЙДЕРСКАЯ СДЕЛКА на "
 		if stock.StockMove == entity.Sale {
 			answerPreview = "🔴" + answerPreview
 			answerDescr += fmt.Sprintf("продажу:")
@@ -22,6 +22,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 			answerPreview = "🟢" + answerPreview
 			answerDescr += fmt.Sprintf("покупку:")
 		}
+		answerDescr, answerPreview = answerPreview, answerDescr
 		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	} else {
 		answerDescr = "Аномальный объем:"
