@@ -243,7 +243,7 @@ func (s ScrapperTAPI) skipTime() bool {
 		return true
 	} else {
 		startTime := time.Date(today.Year(), today.Month(), today.Day(), 9, 50, 0, 0, location)
-		endTime := time.Date(today.Year(), today.Month(), today.Day(), 18, 50, 0, 0, location)
+		endTime := time.Date(today.Year(), today.Month(), today.Day(), 23, 59, 59, 0, location)
 
 		if today.Before(startTime) || today.After(endTime) {
 			return true
