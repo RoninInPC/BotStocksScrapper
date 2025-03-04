@@ -89,7 +89,7 @@ func (s *ScrapperTAPI) Scrape() (<-chan entity.StockInfo, error) {
 				info, isAnomaly := s.analysis.GetAnomaly(stock)
 
 				if isAnomaly {
-					infoStock, b := s.IsAnomaly(mappers.StockByMovementToStock(stock, info), stock, true)
+					infoStock, b := s.IsAnomaly(mappers.StockByMovementToStock(stock, info), stock, true, stock.AnomalySizeVolume)
 					if b {
 						s.StockChannel <- infoStock
 					}
@@ -161,7 +161,7 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 		stockInfo.LotsCount,
 		stockInfo.StockMove)
 
-	stockInfo, _ = s.IsAnomaly(stockInfo, currentStock, false)
+	stockInfo, _ = s.IsAnomaly(stockInfo, currentStock, false, currentStock.AnomalySizeSolo)
 
 	if stockInfo.StockMove != entity.None {
 		ok := s.analysis.Add(stockInfo)
@@ -181,8 +181,8 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 	s.StockChannel <- stockInfo
 }
 
-func (s *ScrapperTAPI) IsAnomaly(info entity.StockInfo, stock entity.Stock, doubleVolume bool) (entity.StockInfo, bool) {
-	if info.Volume >= stock.AnomalySize {
+func (s *ScrapperTAPI) IsAnomaly(info entity.StockInfo, stock entity.Stock, doubleVolume bool, anomalySize float64) (entity.StockInfo, bool) {
+	if info.Volume >= anomalySize {
 		info.IsAnomaly = true
 		s.logger.Warnf("Обнаружена аномалия: NAME:%s PRICE: %f ANOMALY SIZE: %f LOT COUNT: %d STOCK MOVE: %s",
 			info.Stock.Name, info.Stock.Price, info.Volume, info.LotsCount, info.StockMove)

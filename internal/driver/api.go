@@ -67,15 +67,16 @@ func (d *ApiDriver) InitStocks(trackedStocks []list.StockScrapeInfo) ([]entity.S
 		for _, instrument := range instruments {
 			if instrument.Ticker == stock.StockTag {
 				stocks = append(stocks, entity.Stock{
-					Name:         instrument.Name,
-					Ticker:       instrument.Ticker,
-					FIGI:         instrument.Figi,
-					UID:          instrument.Uid,
-					MinLotCount:  int(instrument.Lot),
-					AnomalySize:  stock.AnomalySize,
-					RealExchange: instrument.RealExchange.String(),
-					Exchange:     instrument.Exchange,
-					Price:        0,
+					Name:              instrument.Name,
+					Ticker:            instrument.Ticker,
+					FIGI:              instrument.Figi,
+					UID:               instrument.Uid,
+					MinLotCount:       int(instrument.Lot),
+					AnomalySizeVolume: stock.AnomalySizeVolume,
+					AnomalySizeSolo:   stock.AnomalySizeSolo,
+					RealExchange:      instrument.RealExchange.String(),
+					Exchange:          instrument.Exchange,
+					Price:             0,
 				})
 			}
 		}

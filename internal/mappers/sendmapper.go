@@ -9,19 +9,20 @@ import (
 
 func StockInfoToStringMsg(stock entity.StockInfo) string {
 	volume, rng := VolumeFormater(stock.Volume)
-	answerPreview := fmt.Sprintf("$%s %.2f%% %.2f%s\n", stock.Stock.Ticker, stock.VolumeChange, volume, rng)
+	answerPreview := fmt.Sprintf("#%s %.2f%% %.2f%s\n", stock.Stock.Ticker, stock.VolumeChange, volume, rng)
 	stockName := markdown.ToBold(stock.Stock.Name) + "\n"
 
 	var answerDescr string
 	if stock.StockMove != entity.None {
 		answerDescr = "❗️ИНСАЙДЕРСКАЯ СДЕЛКА на "
 		if stock.StockMove == entity.Sale {
-			answerPreview = "🔴" + answerPreview
-			answerDescr += fmt.Sprintf("продажу:")
+			answerDescr = "🔴" + answerDescr
+			answerDescr += fmt.Sprintf("продажу:\n")
 		} else {
-			answerPreview = "🟢" + answerPreview
-			answerDescr += fmt.Sprintf("покупку:")
+			answerDescr = "🟢" + answerDescr
+			answerDescr += fmt.Sprintf("покупку:\n")
 		}
+		answerDescr = "#единичныесделки\n" + answerDescr
 		answerDescr, answerPreview = answerPreview, answerDescr
 		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	} else {

@@ -38,17 +38,18 @@ func (m MarketType) String() string {
 // UID - Уникальный идентификкатор инструмента внутри Tinkoff API
 // MinLotCount - Минимальное количество акций для торгов (количество акций в лоте)
 // Price - Цена одной акции
-// AnomalySize - Объем от которого сделка считается аномальной
+// AnomalySizeVolume - Объем от которого сделка считается аномальной
 type Stock struct {
-	Name         string
-	Ticker       string
-	FIGI         string
-	UID          string
-	MinLotCount  int
-	RealExchange string
-	Exchange     string
-	Price        float64
-	AnomalySize  float64
+	Name              string
+	Ticker            string
+	FIGI              string
+	UID               string
+	MinLotCount       int
+	RealExchange      string
+	Exchange          string
+	Price             float64
+	AnomalySizeVolume float64
+	AnomalySizeSolo   float64
 }
 
 // Структура описывающая аномалию.

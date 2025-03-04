@@ -12,7 +12,7 @@ var helloString = "Я бот, который просматривает аном
 func ToTelegramFormat(list []list.StockScrapeInfo) string {
 	l := ""
 	for _, v := range list {
-		count, name := getNumStr(v.AnomalySize)
+		count, name := getNumStr(v.AnomalySizeVolume)
 		l += fmt.Sprintf("%s превышающие %d %s,\n", markdown.ToItalic(v.StockTag), count, name)
 	}
 	return markdown.ToBold(helloString) + "\n" + l

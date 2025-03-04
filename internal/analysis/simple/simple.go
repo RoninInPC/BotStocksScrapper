@@ -23,7 +23,7 @@ func (s SimpleAnalysis) RemoveAll() bool {
 
 func (s SimpleAnalysis) GetAnomaly(stock entity.Stock) (entity.StocksByMoveType, bool) {
 	answer := s.GetInfoByTicker(stock.Ticker)
-	if answer.ToSlice().SumVolume() >= stock.AnomalySize {
+	if answer.ToSlice().SumVolume() >= stock.AnomalySizeVolume {
 		return answer, true
 	}
 	return nil, false
