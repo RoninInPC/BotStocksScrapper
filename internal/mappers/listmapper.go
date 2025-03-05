@@ -19,13 +19,13 @@ func ToTelegramFormat(list []list.StockScrapeInfo) string {
 }
 
 func getNumStr(a float64) (int, string) {
-	if a > 1000000000 && a < 1000000000000 {
+	if a >= 1000000000 && a < 1000000000000 {
 		return int(a / 1000000000), "млрд"
 	}
-	if a > 1000000 && a < 1000000000 {
+	if a >= 1000000 && a < 1000000000 {
 		return int(a / 1000000), "млн"
 	}
-	if a > 1000 && a < 1000000 {
+	if a >= 1000 && a < 1000000 {
 		return int(a / 1000), "тыс"
 	}
 	return int(a), ""
