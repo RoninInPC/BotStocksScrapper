@@ -22,7 +22,7 @@ func StockInfoToStringMsg(stock entity.StockInfo) string {
 			answerDescr = "🟢" + answerDescr
 			answerDescr += fmt.Sprintf("покупку:\n")
 		}
-		answerDescr = "#единичныесделки\n" + answerDescr
+		answerDescr = "#инсайд\n" + answerDescr
 		answerDescr, answerPreview = answerPreview, answerDescr
 		answerDescr = fmt.Sprintf("%s\n\n\n", markdown.ToBold(answerDescr))
 	} else {
