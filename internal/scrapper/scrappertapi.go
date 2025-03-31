@@ -154,12 +154,12 @@ func (s *ScrapperTAPI) processingTrade(trade *investapi.Trade, stocks []entity.S
 	stockInfo.Volume = totalVolume
 	stockInfo.LotsCount = trade.Quantity
 
-	s.logger.Debugf("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
-		stockInfo.Stock.Name,
-		stockInfo.Stock.Ticker,
-		stockInfo.Stock.Price,
-		stockInfo.LotsCount,
-		stockInfo.StockMove)
+	/*s.logger.Debugf("Получена обезличенная сделка: NAME: %s; TICKER: %s; PRICE: %f; LOT_COUNT: %d; MOVE: %s",
+	stockInfo.Stock.Name,
+	stockInfo.Stock.Ticker,
+	stockInfo.Stock.Price,
+	stockInfo.LotsCount,
+	stockInfo.StockMove)*/
 
 	stockInfo, _ = s.IsAnomaly(stockInfo, currentStock, false, currentStock.AnomalySizeSolo)
 
