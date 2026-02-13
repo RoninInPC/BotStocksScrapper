@@ -9,6 +9,7 @@ type Config struct {
 	TinkoffApiConfig   investgo.Config `yaml:"tinkoff-parameters"`
 	TgToken            string          `yaml:"tg-token"`
 	ChatID             int64           `yaml:"chat-id"`
+	AdminId            int64           `yaml:"admin-id"`
 	RedisChange        RedisDBConfig   `yaml:"redis-change"`
 	RedisLog           RedisDBConfig   `yaml:"redis-log"`
 	CandleScrapperMode bool            `yaml:"candle-scrapper-mode"`

@@ -13,7 +13,8 @@ func ToTelegramFormat(list []list.StockScrapeInfo) string {
 	l := ""
 	for _, v := range list {
 		count, name := getNumStr(v.AnomalySizeVolume)
-		l += fmt.Sprintf("%s превышающие %d %s,\n", markdown.ToItalic(v.StockTag), count, name)
+		count2, name2 := getNumStr(v.AnomalySizeSolo)
+		l += fmt.Sprintf("%s превышающие %d %s (%d %s),\n", markdown.ToItalic(v.StockTag), count, name, count2, name2)
 	}
 	return markdown.ToBold(helloString) + "\n" + l
 }

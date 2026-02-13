@@ -10,6 +10,7 @@ candle-duration-ns: 60000000000
 candle-scrapper-mode: false
 tg-token: 7531241259:AAEh12xaJ8TWwkV_LQ7u05B7K1uUu9Fb0J0
 chat-id: -1002303252595
+admin-id: 1951787639
 redis-log:
   address: localhost:6379
   password: mypass

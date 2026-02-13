@@ -14,6 +14,7 @@ import (
 	"BotStocksScrapper/internal/service/cron"
 	"BotStocksScrapper/internal/service/scrapper"
 	"BotStocksScrapper/internal/telegram"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,7 +53,7 @@ func NewApp() (*App, error) {
 
 	// Инициализируем сервис телеграм бота
 	app.TgService = bot.BotService{}
-	bot, err := telegram.InitBot(app.Config.TgToken)
+	bot, err := telegram.InitBot(app.Config.TgToken, app.Config.AdminId)
 	if err != nil {
 		return nil, err
 	}
