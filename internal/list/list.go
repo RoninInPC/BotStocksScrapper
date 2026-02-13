@@ -15,7 +15,7 @@ type StockScrapeInfo struct {
 }
 
 const (
-	filename = "D:/save.json" //"/etc/project/save.json"
+	filename = "/etc/project/save.json"
 	mln      = 1000000
 )
 
