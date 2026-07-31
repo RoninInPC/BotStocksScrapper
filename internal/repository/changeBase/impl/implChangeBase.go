@@ -1,0 +1,48 @@
+package impl
+
+import (
+	"context"
+	"fmt"
+
+	"BotStocksScrapper/internal/entity"
+	"github.com/redis/go-redis/v9"
+)
+
+type ChangeBaseRedisRepository struct {
+	client *redis.Client
+}
+
+func NewChangeBaseClient(config entity.RedisDBConfig) *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr:     config.Addr,
+		Password: config.Password,
+		DB:       config.DB,
+	})
+}
+func NewChangeBaseRedisRepository(client *redis.Client) *ChangeBaseRedisRepository {
+	return &ChangeBaseRedisRepository{client: client}
+}
+
+func (r *ChangeBaseRedisRepository) Add(stock entity.StockAdd) bool {
+	ctx := context.Background()
+	err := r.client.HIncrBy(ctx, stock.StockName, stock.Type, stock.NumPrice).Err()
+	if err != nil {
+		fmt.Printf("ОШИБКА РЕДИСКИ: %s\n", err.Error())
+	}
+	return err == nil
+}
+
+func (r *ChangeBaseRedisRepository) Get(stockName, operationType string) int64 {
+	ctx := context.Background()
+	value, err := r.client.HGet(ctx, stockName, operationType).Int64()
+	if err != nil {
+		return 0
+	}
+	return value
+}
+
+func (r *ChangeBaseRedisRepository) Free() bool {
+	ctx := context.Background()
+	err := r.client.FlushDB(ctx).Err()
+	return err == nil
+}

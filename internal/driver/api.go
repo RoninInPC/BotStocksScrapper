@@ -1,0 +1,258 @@
+package driver
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"BotStocksScrapper/internal/list"
+
+	"BotStocksScrapper/internal/entity"
+	tsdk "github.com/tinkoff/invest-api-go-sdk/investgo"
+	investapi "github.com/tinkoff/invest-api-go-sdk/proto"
+)
+
+type ApiDriver struct {
+	config             tsdk.Config
+	client             *tsdk.Client
+	instrumentsClient  *tsdk.InstrumentsServiceClient
+	marketClient       *tsdk.MarketDataServiceClient
+	marketStreamClient *tsdk.MarketDataStreamClient
+	operationsClient   *tsdk.OperationsServiceClient
+	ctx                context.Context
+	tradeChStream      chan *investapi.Trade
+	candleDuration     int64
+	logger             entity.Logger
+}
+
+func NewApiDriver(cfg tsdk.Config, lg entity.Logger, candleDuration int64) (*ApiDriver, error) {
+	driver := &ApiDriver{
+		config: cfg,
+		logger: lg,
+	}
+
+	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	driver.ctx = ctx
+
+	var err error
+	driver.client, err = tsdk.NewClient(ctx, driver.config, driver.logger)
+	if err != nil {
+		return &ApiDriver{}, errors.New(fmt.Sprintf("client creating error %v", err.Error()))
+	}
+
+	driver.instrumentsClient = driver.client.NewInstrumentsServiceClient()
+	driver.marketClient = driver.client.NewMarketDataServiceClient()
+	driver.operationsClient = driver.client.NewOperationsServiceClient()
+	driver.marketStreamClient = driver.client.NewMarketDataStreamClient()
+
+	driver.tradeChStream = make(chan *investapi.Trade, 100)
+	driver.candleDuration = candleDuration
+
+	return driver, nil
+}
+
+// Инициализирует отслеживаемые акции.
+// Заполняет поля структур entity.Stock для дальнейшего использования внутри драйвера
+func (d *ApiDriver) InitStocks(trackedStocks []list.StockScrapeInfo) ([]entity.Stock, error) {
+	stocks := []entity.Stock{}
+
+	s, _ := d.instrumentsClient.Shares(investapi.InstrumentStatus_INSTRUMENT_STATUS_ALL)
+	instruments := s.GetInstruments()
+
+	for _, stock := range trackedStocks {
+		for _, instrument := range instruments {
+			if instrument.Ticker == stock.StockTag {
+				stocks = append(stocks, entity.Stock{
+					Name:              instrument.Name,
+					Ticker:            instrument.Ticker,
+					FIGI:              instrument.Figi,
+					UID:               instrument.Uid,
+					MinLotCount:       int(instrument.Lot),
+					AnomalySizeVolume: stock.AnomalySizeVolume,
+					AnomalySizeSolo:   stock.AnomalySizeSolo,
+					RealExchange:      instrument.RealExchange.String(),
+					Exchange:          instrument.Exchange,
+					Price:             0,
+				})
+			}
+		}
+
+	}
+
+	return stocks, nil
+}
+
+// Запускает стрим подписки на обезличенные сделки
+// Принимает список акций за обезличенными сделками которых необходимо следить
+// Возвращает сущность entity.TradeStream из которой достается через канал сделки по акциям
+func (d *ApiDriver) GetTradeCh(stocks []entity.Stock) (*entity.TradeStream, error) {
+
+	var instrumentIDs []string
+	for _, stock := range stocks {
+		d.logger.Info(stock.UID, stock.Ticker, stock.FIGI)
+		instrumentIDs = append(instrumentIDs, stock.UID)
+	}
+
+	tradeStream := &entity.TradeStream{}
+
+	// Подключаемся к потоку обезличенных сделок
+	var err error
+	tradeStream.Stream, err = d.marketStreamClient.MarketDataStream()
+	if err != nil {
+		d.logger.Errorf("ошибка создания стрима биржевой информации: %s", err.Error())
+		return nil, err
+	}
+
+	tradeStream.Channel, err = tradeStream.Stream.SubscribeTrade(instrumentIDs)
+	if err != nil {
+		d.logger.Errorf("ошибка подписки на стрим обезличенных сделок: %s", err.Error())
+		return nil, err
+	}
+	tradeStream.IsListen = true
+
+	go func() {
+		err := tradeStream.Stream.Listen()
+		if err != nil {
+			d.logger.Errorf("не удалось запустить стрим: %s", err.Error())
+			tradeStream.Stream = nil
+			tradeStream.IsListen = false
+		}
+	}()
+
+	return tradeStream, nil
+}
+
+// Принимает слайс структур entity.StockInfo и дозаполняет информацию об акциях
+// Заполняет данные статистики за день и данные изменения на основе аномалии
+// Сущность entity.StockInfo должна быть предзаполнена
+func (d *ApiDriver) GetPerDayStatistics(stock *entity.StockInfo) error {
+	// Получаем расписание текущей биржи инструмента
+	exchShedule, err := d.GetExchTradingShedule(stock.Stock.Exchange)
+	if err != nil {
+		return err
+	}
+
+	// Получаем свечи инструмента с момента открытия торгового дня
+	response, err := d.marketClient.GetCandles(stock.Stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_30_MIN, exchShedule.Start(), exchShedule.End())
+	if err != nil {
+		d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Stock.Name, stock.Stock.Ticker, err.Error())
+		return err
+	}
+	if response.Candles == nil {
+		d.logger.Errorf("Для инструмента %s:%s нет свечей", stock.Stock.Name, stock.Stock.Ticker)
+		return errors.New("Пустой массив свечей. Информация об акции не заполнена.")
+	}
+
+	candle := response.GetCandles()[0]
+	openPrice := float64(candle.Open.Units) + float64(candle.Open.Nano)/1e9
+
+	// Получаем последнюю сделку по инструменту
+	lpre, err := d.marketClient.GetLastPrices([]string{stock.Stock.UID})
+	if err != nil {
+		d.logger.Errorf("Ошибка получения последних сделок для инструмента %s: %s", stock.Stock.Ticker, err.Error())
+		return err
+	}
+
+	lastPrice := float64(lpre.LastPrices[0].Price.Units) + float64(lpre.LastPrices[0].Price.Nano)/1e9
+
+	// Если сегодня выходной, то метод GetLastPrices вернет последнюю сделку на бирже в последний рабочий день
+	//  Тогда цена первой сделки считается от цены последней сделки в рабочий день
+	today := time.Now()
+	if today.Weekday() == time.Saturday || today.Weekday() == time.Sunday {
+		stock.PerDayPriceChange = math.Round(((stock.Stock.Price-lastPrice)/lastPrice)*10000) / 100
+		d.logger.Info("Выходной день. Процент изменения цены вычисляется по формуле выходного дня")
+	} else {
+		d.logger.Info("Рабочий день. Процент изменения цены вычисляется по формуле рабочего дня")
+		stock.PerDayPriceChange = math.Round(((stock.Stock.Price-openPrice)/openPrice)*10000) / 100
+	}
+
+	return nil
+}
+
+func (d *ApiDriver) anomalyByCandles(stocks []entity.Stock) error {
+	for {
+		exchShedule, err := d.GetExchTradingShedule(stocks[0].Exchange)
+		if err != nil {
+			d.logger.Errorf("Ошибка получения расписания биржи: %s", err.Error())
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		if !exchShedule.Contains(time.Now().Add(-5 * time.Minute)) {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		for _, stock := range stocks {
+			startTimePoint := time.Now()
+			endTimePoint := startTimePoint.Add(time.Duration(d.candleDuration))
+			response, err := d.marketClient.GetCandles(stock.UID, investapi.CandleInterval_CANDLE_INTERVAL_1_MIN, startTimePoint, endTimePoint)
+			if err != nil {
+				d.logger.Errorf("Ошибка получения свечей за день по акции %s-%s: %s", stock.Name, stock.Ticker, err.Error())
+				continue
+			}
+			if response.Candles == nil || len(response.Candles) == 0 {
+				d.logger.Errorf("Для инструмента %s:%s нет свечей", stock.Name, stock.Ticker)
+				continue
+			}
+
+			for _, candle := range response.GetCandles() {
+				price := float64(candle.Close.Units) + float64(candle.Close.Nano)/1e9
+
+				// Создаем сущность *investapi.Trade на основе данных свечи
+				trade := &investapi.Trade{
+					Figi:          stock.FIGI,
+					Price:         &investapi.Quotation{Units: int64(price), Nano: int32((price - float64(int64(price))) * 1e9)},
+					Quantity:      candle.Volume,                                // Количество лотов
+					Direction:     investapi.TradeDirection_TRADE_DIRECTION_BUY, // Направление неизвестно, ставим в качестве заглушки направление покупка
+					InstrumentUid: stock.UID,
+				}
+
+				d.tradeChStream <- trade
+			}
+		}
+		time.Sleep(5 * time.Minute)
+	}
+}
+
+func (d *ApiDriver) GetTradeByCandlesCh(stocks []entity.Stock) <-chan *investapi.Trade {
+	go func() {
+		d.anomalyByCandles(stocks)
+	}()
+	return d.tradeChStream
+}
+
+func (d *ApiDriver) GetExchTradingShedule(exchange string) (shedule *entity.TimeRange, err error) {
+	// Получаем расписание текущей биржи инструмента
+	rsp, err := d.instrumentsClient.TradingSchedules(exchange, time.Now(), time.Now())
+	if err != nil {
+		d.logger.Errorf("Ошибка получения расписания для биржи %s: %s", exchange, err.Error())
+		return nil, errors.New("Ошибка получения расписания биржи.")
+	}
+
+	if rsp.Exchanges == nil {
+		d.logger.Errorf("Отсутствует расписание для биржи %s в ответе API", exchange)
+		return nil, errors.New("Отсутствует расписание для биржи.")
+	}
+	exch := rsp.GetExchanges()[0]
+
+	for _, day := range exch.GetDays() {
+		msk, _ := time.LoadLocation("Europe/Moscow")
+		now := time.Now().In(msk)
+		if day.Date.AsTime().Year() == now.Year() && day.Date.AsTime().YearDay() == now.YearDay() {
+			if !day.IsTradingDay {
+				d.logger.Warnf("Биржа %s закрыта. Данные не заполнены", exchange)
+				return nil, errors.New("Биржа закрыта. Невозможно получить данные")
+			} else {
+				shedule, err = entity.NewTimeRange(day.StartTime.AsTime(), day.EndTime.AsTime())
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	return
+}
