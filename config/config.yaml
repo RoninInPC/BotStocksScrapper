@@ -1,6 +1,6 @@
 tinkoff-parameters:
-  AccountId: 237a944f-7956-44a3-8478-81ba34546f04
-  APIToken: t.-qfSgXeB-qXtuSAYGoGSXQYhOGvtFBFMMjtwcUWb23KgdDhxhlwoGiWBP8bTjKb6vo30dhvaRFSo4LUfM9L_og
+  AccountId: 
+  APIToken: 
   EndPoint: invest-public-api.tinkoff.ru:443
   AppName: invest-api-go-sdk
   DisableResourceExhaustedRetry: false
@@ -8,9 +8,9 @@ tinkoff-parameters:
   MaxRetries: 3
 candle-duration-ns: 60000000000
 candle-scrapper-mode: false
-tg-token: 7531241259:AAEh12xaJ8TWwkV_LQ7u05B7K1uUu9Fb0J0
-chat-id: -1002303252595
-admin-id: 1951787639
+tg-token: 
+chat-id: 
+admin-id:
 redis-log:
   address: localhost:6379
   password: mypass
